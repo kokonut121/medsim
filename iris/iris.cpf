@@ -1,0 +1,9 @@
+[Startup]
+SystemMode=1
+
+[ConfigFile]
+DefaultGlobals=IRISSYS
+
+[Security]
+EnableAudit=1
+

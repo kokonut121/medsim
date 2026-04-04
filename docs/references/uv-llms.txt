@@ -1,0 +1,1 @@
+Python environment note placeholder for future `uv` adoption.

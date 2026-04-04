@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  iris:
+    image: containers.intersystems.com/intersystems/irishealth:2026.1-em-lockeddown
+    environment:
+      ISC_DATA_DIRECTORY: /dur/irisdata
+      ISC_CPF_FILE_NAME: /dur/iris.cpf
+    volumes:
+      - iris-data:/dur/irisdata
+      - ./iris/iris.cpf:/dur/iris.cpf:ro
+      - ./iris/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./iris/fhir_config.json:/dur/fhir_config.json:ro
+    ports:
+      - "1972:1972"
+      - "52773:52773"
+    networks:
+      - internal
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env.example
+    volumes:
+      - .:/app
+    depends_on:
+      - iris
+      - redis
+    ports:
+      - "8000:8000"
+    networks:
+      - internal
+
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - internal
+
+volumes:
+  iris-data:
+
+networks:
+  internal:
+    driver: bridge
+

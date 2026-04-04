@@ -1,0 +1,7 @@
+{
+  "serverName": "MedSentinelFHIR",
+  "fhirVersion": "R4",
+  "strategy": "repository",
+  "namespace": "MEDSENT"
+}
+

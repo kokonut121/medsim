@@ -1,0 +1,6 @@
+MedSentinel visual cues:
+- warm neutral canvas
+- decisive alert colors
+- large viewer-first layouts
+- dense but readable operations panels
+
