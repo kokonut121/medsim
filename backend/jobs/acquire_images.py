@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import pathlib
 from uuid import uuid4
 
 from backend.config import get_settings
@@ -9,10 +10,34 @@ from backend.db.r2_client import r2_client
 from backend.models import ImageMeta
 from backend.pipeline.classify import classify_image
 from backend.pipeline.coverage import build_coverage_from_images
-from backend.pipeline.fal_generator import fill_coverage_gaps, generate_floor_plan
+from backend.pipeline.fal_generator import fill_coverage_gaps, generate_floor_plan, generate_multi_angle_views
 from backend.pipeline.image_acquisition import fetch_osm_building, fetch_places_photos, fetch_street_view
 from backend.pipeline.scene_graph import extract_scene_graph
 from backend.pipeline.world_model import generate_world_model
+
+# ---------------------------------------------------------------------------
+# Local fal.ai image storage (persistent across restarts when R2 not configured)
+# ---------------------------------------------------------------------------
+
+_FAL_DIR = pathlib.Path("data/fal_images")
+
+
+def _store_fal_image(key: str, data: bytes, content_type: str) -> None:
+    """Persist fal.ai generated image bytes. Uses R2 when configured, otherwise local disk."""
+    if r2_client.enabled:
+        r2_client.upload_bytes(key, data, content_type=content_type)
+    else:
+        dest = _FAL_DIR / key.replace("/", "_")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
+
+
+def _fal_public_url(key: str) -> str:
+    """Return a URL that serves this fal image."""
+    if r2_client.enabled:
+        return r2_client.public_url_for(key)
+    safe_name = key.replace("/", "_")
+    return f"/api/fal-images/{safe_name}"
 
 
 def _image_key(facility_id: str, source: str, file_name: str) -> str:
@@ -118,6 +143,52 @@ async def acquire_images_for_facility(facility_id: str, address: str, *, model_i
             # Rebuild coverage now that gaps are filled
             covered_areas, gap_areas = build_coverage_from_images(iris_client.list_images_for_facility(facility_id))
             iris_client.update_coverage(facility_id, covered_areas, gap_areas)
+
+        # Generate additional angles with fal.ai using real photos as reference.
+        # This happens BEFORE world model generation so the angles become part
+        # of the source imagery pool that feeds the world model.
+        iris_client.update_model(model.model_id, status="augmenting")
+        reference_bytes = [img["bytes"] for img in uploaded_images[:3] if img.get("bytes")]
+        angle_images = await generate_multi_angle_views(
+            facility.name,
+            reference_images=reference_bytes or None,
+        )
+        for image in angle_images:
+            key = _image_key(facility_id, image["source"], image["file_name"])
+            _store_fal_image(key, image["bytes"], image["content_type"])
+            image_meta = iris_client.write_image_meta(
+                ImageMeta(
+                    image_id=f"img_{uuid4().hex[:8]}",
+                    facility_id=facility_id,
+                    source=image["source"],
+                    r2_key=key,
+                    public_url=_fal_public_url(key),
+                    heading=image.get("heading"),
+                    content_type=image["content_type"],
+                    category=image.get("label"),
+                    created_at=facility.created_at,
+                )
+            )
+            angle_class = {
+                "category": image.get("label") or "other",
+                "confidence": 0.75,
+                "notes": "fal.ai angle augmentation",
+                "source": image["source"],
+            }
+            iris_client.update_image_classification(
+                image_meta.image_id,
+                category=angle_class["category"],
+                confidence=angle_class["confidence"],
+                notes=angle_class["notes"],
+            )
+            uploaded_images.append({
+                **image,
+                "image_id": image_meta.image_id,
+                "r2_key": image_meta.r2_key,
+                "public_url": image_meta.public_url,
+                "index": len(uploaded_images) + 1,
+            })
+            classified.append(angle_class)
 
         iris_client.update_model(model.model_id, status="generating")
         scene_graph = await extract_scene_graph(classified, osm)

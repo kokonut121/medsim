@@ -29,9 +29,6 @@ export default async function FacilityDetailPage({ params }: { params: Promise<{
               </div>
               <h3>{unit.name}</h3>
               <div className="cta-row">
-                <Link className="button secondary" href={`/facility/${id}/coverage` as Route}>
-                  Coverage
-                </Link>
                 <Link className="button" href={`/facility/${id}/model/${unit.unit_id}` as Route}>
                   Open model
                 </Link>

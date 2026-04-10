@@ -53,98 +53,98 @@ class MemoryIRISClient:
         created_at = utcnow() - timedelta(days=2)
         facility = Facility(
             facility_id=facility_id,
-            name="Northwestern Memorial — Trauma Center",
-            address="251 E Huron St, Chicago, IL 60611",
-            lat=41.8949406,
-            lng=-87.621438,
-            org_id="org_demo",
-            google_place_id="ChIJa7pTLKssDogRN-wo98jjo6A",
-            osm_building_id="osm-demo-1",
+            name="LeTourneau University — Nursing Skills Lab",
+            address="2100 S Mobberly Ave, Longview, TX 75602",
+            lat=32.4795,
+            lng=-94.7390,
+            org_id="org_letu",
+            google_place_id="letu-nursing-lab-placeholder",
+            osm_building_id="osm-letu-1",
             created_at=created_at,
         )
         self.facilities[facility_id] = facility
 
-        for index, unit_type in enumerate(["ED", "ICU"], start=1):
-            unit_id = f"unit_{index}"
-            self.units[unit_id] = Unit(
-                unit_id=unit_id,
-                facility_id=facility_id,
-                name=f"{unit_type} Unit",
-                floor=index,
-                unit_type=unit_type,
-                created_at=created_at,
-            )
+        unit_id = "unit_1"
+        self.units[unit_id] = Unit(
+            unit_id=unit_id,
+            facility_id=facility_id,
+            name="Nursing Skills Lab",
+            floor=1,
+            unit_type="skills_lab",
+            created_at=created_at,
+        )
 
         scene_graph = {
             "units": [
                 {
                     "unit_id": "unit_1",
-                    "unit_type": "Trauma Center",
+                    "unit_type": "Nursing Skills Lab",
                     "rooms": [
-                        # ── Ambulance Bay ──────────────────────────────────────
+                        # ── Entry / Reception ──────────────────────────────────
                         {
-                            "room_id": "TC-ENTRY",
-                            "type": "ed_entrance_ambulance_bay",
-                            "area_sqft_estimate": 700,
+                            "room_id": "NL-ENTRY",
+                            "type": "lobby_main_entrance",
+                            "area_sqft_estimate": 200,
                             "equipment": [
-                                {"type": "hand_hygiene_dispenser", "position": "bay door right", "accessible": True, "confidence": 0.95},
+                                {"type": "hand_hygiene_dispenser", "position": "entry door right", "accessible": True, "confidence": 0.94},
                             ],
-                            "adjacency": ["TC-CORRIDOR"],
+                            "adjacency": ["NL-HALL"],
                             "sightline_to_nursing_station": False,
-                            "image_source_quality": "street_view",
+                            "image_source_quality": "supplemental",
                             "grid_col": 0, "grid_row": 0,
                         },
-                        # ── Main Trauma Corridor ───────────────────────────────
+                        # ── Main Hallway ───────────────────────────────────────
                         {
-                            "room_id": "TC-CORRIDOR",
+                            "room_id": "NL-HALL",
                             "type": "corridor_hallway",
-                            "area_sqft_estimate": 1200,
+                            "area_sqft_estimate": 600,
                             "equipment": [
-                                {"type": "crash_cart", "position": "far end alcove — 90ft from TB-3", "accessible": True, "confidence": 0.90},
+                                {"type": "crash_cart", "position": "alcove outside SIM-1", "accessible": True, "confidence": 0.88},
                             ],
-                            "adjacency": ["TC-ENTRY", "TB-1", "TB-2", "TB-3", "TC-RESUS", "TC-NS", "TC-MED", "TC-OR", "TC-CT", "TC-SUPPLY"],
+                            "adjacency": ["NL-ENTRY", "NL-SIM1", "NL-SIM2", "NL-SIM3", "NL-DEBRIEF", "NL-SKILLS-A", "NL-SKILLS-B", "NL-SUPPLY", "NL-CONTROL"],
                             "sightline_to_nursing_station": True,
-                            "image_source_quality": "places",
+                            "image_source_quality": "supplemental",
                             "grid_col": 0, "grid_row": 1,
                         },
-                        # ── Trauma Bays (north side of corridor) ──────────────
+                        # ── Simulation Bays ────────────────────────────────────
                         {
-                            "room_id": "TB-1",
-                            "type": "icu_bay",
-                            "area_sqft_estimate": 380,
+                            "room_id": "NL-SIM1",
+                            "type": "patient_room",
+                            "area_sqft_estimate": 320,
                             "equipment": [
-                                {"type": "monitor", "position": "ceiling boom", "accessible": True, "confidence": 0.96},
-                                {"type": "ventilator", "position": "head of bay", "accessible": True, "confidence": 0.93},
-                                {"type": "iv_pole", "position": "left rail", "accessible": True, "confidence": 0.91},
-                                {"type": "hand_hygiene_dispenser", "position": "bay entry left", "accessible": True, "confidence": 0.94},
+                                {"type": "monitor", "position": "wall mount above bed", "accessible": True, "confidence": 0.96},
+                                {"type": "iv_pole", "position": "bedside right", "accessible": True, "confidence": 0.93},
+                                {"type": "hand_hygiene_dispenser", "position": "door entry", "accessible": True, "confidence": 0.97},
+                                {"type": "call_light", "position": "bed rail", "accessible": True, "confidence": 0.91},
                             ],
-                            "adjacency": ["TC-CORRIDOR"],
+                            "adjacency": ["NL-HALL"],
                             "sightline_to_nursing_station": True,
-                            "image_source_quality": "places",
+                            "image_source_quality": "supplemental",
                             "grid_col": 0, "grid_row": 2,
                         },
                         {
-                            "room_id": "TB-2",
-                            "type": "icu_bay",
-                            "area_sqft_estimate": 380,
+                            "room_id": "NL-SIM2",
+                            "type": "patient_room",
+                            "area_sqft_estimate": 320,
                             "equipment": [
-                                {"type": "monitor", "position": "ceiling boom", "accessible": True, "confidence": 0.95},
-                                {"type": "ventilator", "position": "head of bay", "accessible": True, "confidence": 0.92},
-                                {"type": "iv_pole", "position": "right rail", "accessible": True, "confidence": 0.90},
-                                {"type": "hand_hygiene_dispenser", "position": "bay entry — inaccessible behind cart", "accessible": False, "confidence": 0.71},
+                                {"type": "monitor", "position": "wall mount above bed", "accessible": True, "confidence": 0.95},
+                                {"type": "ventilator", "position": "head of bed", "accessible": True, "confidence": 0.90},
+                                {"type": "iv_pole", "position": "bedside left", "accessible": True, "confidence": 0.92},
+                                {"type": "hand_hygiene_dispenser", "position": "door entry — low stock", "accessible": False, "confidence": 0.68},
                             ],
-                            "adjacency": ["TC-CORRIDOR"],
+                            "adjacency": ["NL-HALL"],
                             "sightline_to_nursing_station": True,
-                            "image_source_quality": "places",
+                            "image_source_quality": "supplemental",
                             "grid_col": 1, "grid_row": 2,
                         },
                         {
-                            "room_id": "TB-3",
-                            "type": "icu_bay",
-                            "area_sqft_estimate": 380,
+                            "room_id": "NL-SIM3",
+                            "type": "patient_room",
+                            "area_sqft_estimate": 320,
                             "equipment": [
-                                {"type": "monitor", "position": "ceiling boom", "accessible": True, "confidence": 0.94},
-                                {"type": "ventilator", "position": "head of bay", "accessible": True, "confidence": 0.91},
+                                {"type": "monitor", "position": "ceiling arm", "accessible": True, "confidence": 0.94},
+                                {"type": "iv_pole", "position": "bedside right", "accessible": True, "confidence": 0.91},
+                                {"type": "hand_hygiene_dispenser", "position": "missing", "accessible": False, "confidence": 0.82},
                                 {"type": "call_light", "position": "missing", "accessible": False, "confidence": 0.62},
                             ],
                             "adjacency": ["TC-CORRIDOR"],
@@ -152,99 +152,84 @@ class MemoryIRISClient:
                             "image_source_quality": "places",
                             "grid_col": 2, "grid_row": 2,
                         },
-                        # ── Resuscitation Room ─────────────────────────────────
+                        # ── Debriefing Room ────────────────────────────────────
                         {
-                            "room_id": "TC-RESUS",
-                            "type": "operating_room",
-                            "area_sqft_estimate": 500,
+                            "room_id": "NL-DEBRIEF",
+                            "type": "nursing_station",
+                            "area_sqft_estimate": 280,
                             "equipment": [
-                                {"type": "monitor", "position": "dual ceiling arms", "accessible": True, "confidence": 0.97},
-                                {"type": "ventilator", "position": "anesthesia station", "accessible": True, "confidence": 0.96},
-                                {"type": "hand_hygiene_dispenser", "position": "scrub sink outside", "accessible": True, "confidence": 0.95},
-                                {"type": "crash_cart", "position": "MISSING — not stocked here", "accessible": False, "confidence": 0.60},
+                                {"type": "workstation", "position": "instructor desk", "accessible": True, "confidence": 0.95},
+                                {"type": "monitor", "position": "wall display", "accessible": True, "confidence": 0.93},
                             ],
-                            "adjacency": ["TC-CORRIDOR", "TC-OR"],
+                            "adjacency": ["NL-HALL"],
                             "sightline_to_nursing_station": False,
-                            "image_source_quality": "places",
+                            "image_source_quality": "supplemental",
                             "grid_col": 3, "grid_row": 2,
                         },
-                        # ── Nursing Station ────────────────────────────────────
+                        # ── Skills Station A ───────────────────────────────────
                         {
-                            "room_id": "TC-NS",
-                            "type": "nursing_station",
-                            "area_sqft_estimate": 320,
+                            "room_id": "NL-SKILLS-A",
+                            "type": "patient_room",
+                            "area_sqft_estimate": 250,
                             "equipment": [
-                                {"type": "workstation", "position": "central desk — 3 terminals", "accessible": True, "confidence": 0.97},
-                                {"type": "hand_hygiene_dispenser", "position": "desk entry both sides", "accessible": True, "confidence": 0.96},
+                                {"type": "iv_pole", "position": "task trainer station", "accessible": True, "confidence": 0.90},
+                                {"type": "hand_hygiene_dispenser", "position": "counter left", "accessible": True, "confidence": 0.92},
                             ],
-                            "adjacency": ["TC-CORRIDOR"],
-                            "sightline_to_nursing_station": True,
-                            "image_source_quality": "places",
+                            "adjacency": ["NL-HALL"],
+                            "sightline_to_nursing_station": False,
+                            "image_source_quality": "supplemental",
                             "grid_col": 0, "grid_row": 3,
                         },
-                        # ── Medication Room ────────────────────────────────────
+                        # ── Skills Station B ───────────────────────────────────
                         {
-                            "room_id": "TC-MED",
-                            "type": "medication_room_pharmacy",
-                            "area_sqft_estimate": 180,
+                            "room_id": "NL-SKILLS-B",
+                            "type": "patient_room",
+                            "area_sqft_estimate": 250,
                             "equipment": [
-                                {"type": "adc", "position": "back wall — single unit", "accessible": True, "confidence": 0.95},
-                                {"type": "workstation", "position": "counter", "accessible": True, "confidence": 0.91},
+                                {"type": "monitor", "position": "task trainer station", "accessible": True, "confidence": 0.89},
+                                {"type": "hand_hygiene_dispenser", "position": "counter right — empty", "accessible": False, "confidence": 0.74},
                             ],
-                            "adjacency": ["TC-CORRIDOR"],
+                            "adjacency": ["NL-HALL"],
                             "sightline_to_nursing_station": False,
-                            "image_source_quality": "places",
+                            "image_source_quality": "supplemental",
                             "grid_col": 1, "grid_row": 3,
                         },
-                        # ── Trauma OR ──────────────────────────────────────────
+                        # ── Supply / Medication Room ───────────────────────────
                         {
-                            "room_id": "TC-OR",
-                            "type": "operating_room",
-                            "area_sqft_estimate": 600,
-                            "equipment": [
-                                {"type": "monitor", "position": "OR boom", "accessible": True, "confidence": 0.97},
-                                {"type": "ventilator", "position": "anesthesia station", "accessible": True, "confidence": 0.96},
-                                {"type": "hand_hygiene_dispenser", "position": "scrub sink", "accessible": True, "confidence": 0.98},
-                            ],
-                            "adjacency": ["TC-CORRIDOR", "TC-RESUS"],
-                            "sightline_to_nursing_station": False,
-                            "image_source_quality": "places",
-                            "grid_col": 2, "grid_row": 3,
-                        },
-                        # ── CT / Radiology ─────────────────────────────────────
-                        {
-                            "room_id": "TC-CT",
-                            "type": "utility_support",
-                            "area_sqft_estimate": 420,
-                            "equipment": [
-                                {"type": "monitor", "position": "control console", "accessible": True, "confidence": 0.94},
-                            ],
-                            "adjacency": ["TC-CORRIDOR"],
-                            "sightline_to_nursing_station": False,
-                            "image_source_quality": "street_view",
-                            "grid_col": 3, "grid_row": 3,
-                        },
-                        # ── Supply / Clean Utility ─────────────────────────────
-                        {
-                            "room_id": "TC-SUPPLY",
-                            "type": "utility_support",
+                            "room_id": "NL-SUPPLY",
+                            "type": "medication_room_pharmacy",
                             "area_sqft_estimate": 160,
                             "equipment": [
-                                {"type": "hand_hygiene_dispenser", "position": "door entry", "accessible": True, "confidence": 0.89},
+                                {"type": "adc", "position": "back wall", "accessible": True, "confidence": 0.94},
+                                {"type": "hand_hygiene_dispenser", "position": "door entry", "accessible": True, "confidence": 0.91},
                             ],
-                            "adjacency": ["TC-CORRIDOR"],
+                            "adjacency": ["NL-HALL"],
                             "sightline_to_nursing_station": False,
-                            "image_source_quality": "street_view",
-                            "grid_col": 4, "grid_row": 3,
+                            "image_source_quality": "supplemental",
+                            "grid_col": 2, "grid_row": 3,
+                        },
+                        # ── Control / Faculty Room ─────────────────────────────
+                        {
+                            "room_id": "NL-CONTROL",
+                            "type": "utility_support",
+                            "area_sqft_estimate": 140,
+                            "equipment": [
+                                {"type": "workstation", "position": "AV control desk — 2 terminals", "accessible": True, "confidence": 0.96},
+                                {"type": "monitor", "position": "sim bay observation screens", "accessible": True, "confidence": 0.95},
+                            ],
+                            "adjacency": ["NL-HALL"],
+                            "sightline_to_nursing_station": False,
+                            "image_source_quality": "supplemental",
+                            "grid_col": 3, "grid_row": 3,
                         },
                     ],
                 }
             ],
             "flow_annotations": {
-                "patient_flow_paths": [["TC-ENTRY", "TC-CORRIDOR", "TB-1"]],
-                "staff_flow_paths": [["TC-NS", "TC-CORRIDOR", "TC-MED", "TB-2"]],
-                "clean_corridors": ["TC-CORRIDOR"],
-                "dirty_corridors": ["TC-SUPPLY"],
+                "patient_flow_paths": [["NL-ENTRY", "NL-HALL", "NL-SIM1"]],
+                "staff_flow_paths": [["NL-CONTROL", "NL-HALL", "NL-SUPPLY"]],
+                "clean_corridors": ["NL-HALL"],
+                "dirty_corridors": ["NL-SUPPLY"],
             },
         }
         self.models["model_unit_1"] = WorldModel(
@@ -255,21 +240,18 @@ class MemoryIRISClient:
             scene_graph_json=scene_graph,
             world_labs_world_id="65bab75f-b181-4314-be3a-3b3cb88c3deb",
             world_marble_url="https://marble.worldlabs.ai/world/65bab75f-b181-4314-be3a-3b3cb88c3deb",
-            caption="Northwestern Memorial — Trauma Center world model (VR video extraction)",
-            source_image_count=13,
+            caption="LeTourneau University — Nursing Skills Lab world model",
+            source_image_count=0,
             created_at=created_at,
             completed_at=created_at + timedelta(hours=1),
         )
 
         self.coverage_maps[facility_id] = CoverageMap(
             facility_id=facility_id,
-            covered_areas=[
-                CoverageArea(area_id="main_entrance", source="street_view", image_count=8, category="building_exterior"),
-                CoverageArea(area_id="lobby", source="places_photos", image_count=11, category="lobby_main_entrance"),
-            ],
+            covered_areas=[],
             gap_areas=[
-                GapArea(area_id="icu_corridor_west", description="Interior corridor imagery missing"),
-                GapArea(area_id="med_room_2", description="Medication preparation zone not visible"),
+                GapArea(area_id="sim_bays", description="Simulation bay interior imagery needed"),
+                GapArea(area_id="hallway", description="Lab hallway not yet captured"),
             ],
             updated_at=created_at,
         )

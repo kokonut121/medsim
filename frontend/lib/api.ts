@@ -1,5 +1,4 @@
 import type {
-  CoverageMap,
   Facility,
   FacilityCreateInput,
   Finding,
@@ -45,8 +44,7 @@ export const api = {
     parse<Facility>("/api/facilities", { method: "POST", body: JSON.stringify(payload) }),
   getFacility: (facilityId: string) =>
     parse<{ facility: Facility; units: Unit[]; models: WorldModel[] }>(`/api/facilities/${facilityId}`),
-  getCoverage: (facilityId: string) => parse<CoverageMap>(`/api/facilities/${facilityId}/coverage`),
-  triggerAcquisition: (facilityId: string) => parse(`/api/facilities/${facilityId}/acquire`, { method: "POST" }),
+triggerAcquisition: (facilityId: string) => parse(`/api/facilities/${facilityId}/acquire`, { method: "POST" }),
   getModelStatus: (unitId: string) => parse<ModelStatusResponse>(`/api/models/${unitId}/status`),
   runScan: (unitId: string) => parse<Scan>(`/api/scans/${unitId}/run`, { method: "POST" }),
   getScanStatus: (unitId: string) => parse<Scan>(`/api/scans/${unitId}/status`),
@@ -61,5 +59,11 @@ export const api = {
   getLatestSimulation: (unitId: string) =>
     parse<ScenarioSimulation>(`/api/simulate/${unitId}/latest`),
   listSimulations: (unitId: string) =>
-    parse<ScenarioSimulation[]>(`/api/simulate/${unitId}/list`)
+    parse<ScenarioSimulation[]>(`/api/simulate/${unitId}/list`),
+  listFacilityImages: (facilityId: string) =>
+    parse<{ image_id: string; url: string; source: string; category: string | null; heading: number | null }[]>(`/api/facilities/${facilityId}/images`),
+  listAngles: (facilityId: string) =>
+    parse<{ label: string; url: string }[]>(`/api/facilities/${facilityId}/angles`),
+  generateAngles: (facilityId: string) =>
+    parse(`/api/facilities/${facilityId}/generate-angles`, { method: "POST" }),
 };

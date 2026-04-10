@@ -29,7 +29,10 @@ def _cluster_by_spatial_anchor(findings: list[dict], radius: float) -> list[list
 
 def consensus_synthesis_engine(team_results: list[list[dict]]) -> list[dict]:
     all_findings = [finding for team in team_results for finding in team]
-    location_groups = _cluster_by_spatial_anchor(all_findings, radius=5.0)
+    # Radius = 0.5 world units ≈ slightly less than one grid cell (GRID_SCALE=0.8).
+    # Only findings in the same room (same grid position) get merged; adjacent
+    # rooms remain separate findings so nothing collapses across the whole scene.
+    location_groups = _cluster_by_spatial_anchor(all_findings, radius=0.5)
 
     synthesized = []
     for group in location_groups:

@@ -35,13 +35,6 @@ export interface Scan {
   completed_at: string | null;
 }
 
-export interface CoverageMap {
-  facility_id: string;
-  covered_areas: Array<{ area_id: string; source: string; image_count: number; category?: string | null }>;
-  gap_areas: Array<{ area_id: string; description: string }>;
-  updated_at?: string | null;
-}
-
 export interface Facility {
   facility_id: string;
   name: string;

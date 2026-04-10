@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+import pathlib
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from backend.api.facilities import router as facilities_router
 from backend.api.fhir import router as fhir_router
@@ -40,4 +43,18 @@ app.include_router(websocket_router)
 @app.get("/health")
 async def health():
     return {"status": "ok", "app": settings.app_name}
+
+
+_FAL_DIR = pathlib.Path("data/fal_images")
+
+
+@app.get("/api/fal-images/{filename:path}")
+async def serve_fal_image(filename: str):
+    """Serve locally-stored fal.ai generated images when R2 is not configured."""
+    path = _FAL_DIR / filename
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Image not found")
+    suffix = path.suffix.lower()
+    media = "image/jpeg" if suffix in (".jpg", ".jpeg") else "image/png"
+    return FileResponse(path, media_type=media, headers={"Cache-Control": "public, max-age=86400"})
 
