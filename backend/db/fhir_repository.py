@@ -48,6 +48,11 @@ class FHIRRepositoryClient:
             timeout=self._timeout,
         )
         response.raise_for_status()
+        if not response.content.strip():
+            return resource
+        content_type = response.headers.get("content-type", "").lower()
+        if "json" not in content_type and not response.text.lstrip().startswith("{"):
+            return resource
         return response.json()
 
     def push_bundle(self, resources: list[dict[str, Any]], *, target_base: str) -> dict[str, Any]:

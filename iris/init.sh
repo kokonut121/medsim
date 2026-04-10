@@ -68,15 +68,21 @@ for attempt in $(seq 1 30); do
   sleep 2
 done
 
-if ! iris session "${IRIS_INSTANCE}" -U %SYS <<'EOF'
+session_output="$(iris session "${IRIS_INSTANCE}" -U %SYS <<'EOF'
 set classPath=$system.Util.GetEnviron("BOOTSTRAP_CLASS_PATH")
-if classPath="" write !,"[MedSentinel] BOOTSTRAP_CLASS_PATH is not set",! halt 1
+if classPath="" write !,"[MedSentinel] BOOTSTRAP_CLASS_PATH is not set",! halt
 set sc=$SYSTEM.OBJ.Load(classPath,"ck")
-if $SYSTEM.Status.IsError(sc) write !,"[MedSentinel] Unable to load bootstrap class from ",classPath,! do $SYSTEM.Status.DisplayError(sc) halt 1
+if $SYSTEM.Status.IsError(sc) write !,"[MedSentinel] Unable to load bootstrap class from ",classPath,!
+if $SYSTEM.Status.IsError(sc) do $SYSTEM.Status.DisplayError(sc)
+if $SYSTEM.Status.IsError(sc) halt
 do ##class(MedSentinel.Installer).Main()
-halt 0
+halt
 EOF
-then
+)"
+
+printf '%s\n' "${session_output}"
+
+if [[ "${session_output}" != *"[MedSentinel] Bootstrap finished successfully"* ]]; then
   echo "MedSentinel IRIS bootstrap failed" >&2
   exit 1
 fi

@@ -4,18 +4,16 @@ pydantic==2.11.3
 pydantic-settings==2.8.1
 httpx==0.28.1
 intersystems-irispython==5.3.1
-boto3==1.40.59
+boto3==1.42.87
 reportlab==4.3.1
 redis==5.2.1
 pytest==8.3.5
-<<<<<<< HEAD
 fal-client==0.13.2
 openai>=2.0.0
-boto3==1.42.87
 yt-dlp>=2025.1.15
 py360convert>=1.0.3
 numpy>=1.26
 Pillow>=10.0
-
-=======
->>>>>>> d4eefc8 (Attemping IRIS fixes)
+matplotlib>=3.9
+opencv-python-headless>=4.10
+python-multipart>=0.0.9

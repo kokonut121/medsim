@@ -9,8 +9,8 @@ from uuid import uuid4
 
 from backend.config import Settings, get_settings
 from backend.db.fhir_repository import FHIRRepositoryClient
+from backend.reports.fhir_projector import build_diagnostic_report, build_observation, fhir_safe_id
 from backend.models import CoverageArea, CoverageMap, Facility, FacilityCreate, Finding, GapArea, ImageMeta, Scan, ScenarioSimulation, Unit, WorldModel
-from backend.reports.fhir_projector import build_diagnostic_report, build_observation
 
 
 logger = logging.getLogger(__name__)
@@ -455,8 +455,10 @@ class MemoryIRISClient:
         for finding in findings:
             obs = build_observation(finding)
             self._fhir_resources[f"Observation/{finding.finding_id}"] = obs
+            self._fhir_resources[f"Observation/{obs['id']}"] = obs
         report = build_diagnostic_report(scan)
         self._fhir_resources[f"DiagnosticReport/{scan.scan_id}"] = report
+        self._fhir_resources[f"DiagnosticReport/{report['id']}"] = report
         return scan
 
     def list_findings(self, unit_id: str, domain: str | None = None, severity: str | None = None, room_id: str | None = None) -> list[Finding]:
@@ -473,7 +475,7 @@ class MemoryIRISClient:
     def get_finding(self, finding_id: str) -> Finding:
         for findings in self.findings_by_scan.values():
             for finding in findings:
-                if finding.finding_id == finding_id:
+                if finding.finding_id == finding_id or fhir_safe_id(finding.finding_id) == finding_id:
                     return finding
         raise KeyError(finding_id)
 
@@ -523,6 +525,8 @@ class MemoryIRISClient:
             return cached
         scan = self.scans.get(scan_id)
         if not scan:
+            scan = next((item for item in self.scans.values() if fhir_safe_id(item.scan_id) == scan_id), None)
+        if scan is None:
             raise KeyError(scan_id)
         return build_diagnostic_report(scan)
 
@@ -549,6 +553,53 @@ class MemoryIRISClient:
             password=settings.iris_password,
         )
         return fhir_client.push_bundle([*observations, report], target_base=destination)
+
+
+class FHIRServiceIRISClient(MemoryIRISClient):
+    """
+    FHIR-only mode: keep MedSentinel domain data in the in-memory dev store,
+    but use the live IRIS FHIR repository for interoperability reads/writes
+    whenever it is available.
+    """
+
+    mode = "fhir"
+
+    def __init__(self, settings: Settings) -> None:
+        self._settings = settings
+        self._fhir_repository = FHIRRepositoryClient(
+            base_url=settings.iris_fhir_base,
+            username=settings.iris_user,
+            password=settings.iris_password,
+        )
+        super().__init__()
+
+    def write_findings(self, scan: Scan, findings: list[Finding]) -> Scan:
+        stored_scan = super().write_findings(scan, findings)
+        try:
+            for finding in findings:
+                self._fhir_repository.put_resource(build_observation(finding))
+            self._fhir_repository.put_resource(build_diagnostic_report(stored_scan))
+        except Exception:
+            logger.exception("Failed to project scan %s into the live IRIS FHIR repository", scan.scan_id)
+        return stored_scan
+
+    def get_diagnostic_report_resource(self, scan_id: str) -> dict[str, Any]:
+        try:
+            resource = self._fhir_repository.get_resource("DiagnosticReport", fhir_safe_id(scan_id))
+            if resource is not None:
+                return resource
+        except Exception:
+            logger.exception("Failed to fetch DiagnosticReport/%s from the live IRIS FHIR repository", scan_id)
+        return super().get_diagnostic_report_resource(scan_id)
+
+    def get_observation_resource(self, finding_id: str) -> dict[str, Any]:
+        try:
+            resource = self._fhir_repository.get_resource("Observation", fhir_safe_id(finding_id))
+            if resource is not None:
+                return resource
+        except Exception:
+            logger.exception("Failed to fetch Observation/%s from the live IRIS FHIR repository", finding_id)
+        return super().get_observation_resource(finding_id)
 
 
 class NativeIRISClient:
@@ -866,9 +917,12 @@ class NativeIRISClient:
 
     def get_finding(self, finding_id: str) -> Finding:
         finding = self._load_json("MedSentinel.Finding", finding_id)
-        if finding is None:
-            raise KeyError(finding_id)
-        return Finding.model_validate(finding)
+        if finding is not None:
+            return Finding.model_validate(finding)
+        for candidate in self._load_models("MedSentinel.Finding", Finding).values():
+            if fhir_safe_id(candidate.finding_id) == finding_id:
+                return candidate
+        raise KeyError(finding_id)
 
     def list_models(self, unit_id: str) -> list[WorldModel]:
         return [model for model in self.models.values() if model.unit_id == unit_id]
@@ -882,13 +936,15 @@ class NativeIRISClient:
     def get_diagnostic_report_resource(self, scan_id: str) -> dict[str, Any]:
         scan = self.scans.get(scan_id)
         if not scan:
+            scan = next((item for item in self.scans.values() if fhir_safe_id(item.scan_id) == scan_id), None)
+        if scan is None:
             raise KeyError(scan_id)
-        resource = self._fhir_repository.get_resource("DiagnosticReport", scan_id)
+        resource = self._fhir_repository.get_resource("DiagnosticReport", fhir_safe_id(scan.scan_id))
         return resource or build_diagnostic_report(scan)
 
     def get_observation_resource(self, finding_id: str) -> dict[str, Any]:
         finding = self.get_finding(finding_id)
-        resource = self._fhir_repository.get_resource("Observation", finding_id)
+        resource = self._fhir_repository.get_resource("Observation", fhir_safe_id(finding.finding_id))
         return resource or build_observation(finding)
 
     def push_diagnostic_report(self, scan_id: str, target: str | None = None) -> dict[str, Any]:
@@ -910,8 +966,10 @@ class NativeIRISClient:
 
 def create_iris_client() -> MemoryIRISClient | NativeIRISClient:
     settings = get_settings()
-    if settings.iris_mode != "native":
+    if settings.iris_mode == "memory":
         return MemoryIRISClient()
+    if settings.iris_mode == "fhir":
+        return FHIRServiceIRISClient(settings)
     try:
         return NativeIRISClient(settings)
     except Exception:
@@ -921,4 +979,6 @@ def create_iris_client() -> MemoryIRISClient | NativeIRISClient:
         raise
 
 
+# Backwards-compatible constructor used by tests and older imports.
+IRISClient = MemoryIRISClient
 iris_client = create_iris_client()
