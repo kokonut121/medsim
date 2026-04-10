@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import mimetypes
+
 import httpx
 
 
@@ -7,10 +9,28 @@ STREET_VIEW_BASE = "https://maps.googleapis.com/maps/api/streetview"
 HEADINGS = [0, 45, 90, 135, 180, 225, 270, 315]
 
 
-async def fetch_street_view(lat: float, lng: float, api_key: str) -> list[bytes]:
-    images: list[bytes] = []
+def _content_type_from_response(response: httpx.Response, fallback: str = "image/jpeg") -> str:
+    return response.headers.get("content-type", fallback).split(";")[0]
+
+
+def _extension_for(content_type: str) -> str:
+    return mimetypes.guess_extension(content_type) or ".jpg"
+
+
+async def fetch_street_view(lat: float, lng: float, api_key: str) -> list[dict]:
+    images: list[dict] = []
     if not api_key:
-        return [f"synthetic-street-view-{heading}".encode() for heading in HEADINGS]
+        return [
+            {
+                "bytes": f"synthetic-street-view-{heading}".encode(),
+                "source": "street_view",
+                "heading": heading,
+                "content_type": "image/jpeg",
+                "area_id": f"street_view_{heading}",
+                "file_name": f"street-view-{heading}.jpg",
+            }
+            for heading in HEADINGS
+        ]
     async with httpx.AsyncClient() as client:
         for heading in HEADINGS:
             response = await client.get(
@@ -25,27 +45,57 @@ async def fetch_street_view(lat: float, lng: float, api_key: str) -> list[bytes]
                 },
             )
             if response.status_code == 200:
-                images.append(response.content)
+                content_type = _content_type_from_response(response)
+                images.append(
+                    {
+                        "bytes": response.content,
+                        "source": "street_view",
+                        "heading": heading,
+                        "content_type": content_type,
+                        "area_id": f"street_view_{heading}",
+                        "file_name": f"street-view-{heading}{_extension_for(content_type)}",
+                    }
+                )
     return images
 
 
-async def fetch_places_photos(place_id: str, api_key: str, max_photos: int = 40) -> list[bytes]:
+async def fetch_places_photos(place_id: str, api_key: str, max_photos: int = 40) -> list[dict]:
+    if not place_id:
+        return []
     if not api_key:
-        return [f"synthetic-places-photo-{index}".encode() for index in range(min(6, max_photos))]
+        return [
+            {
+                "bytes": f"synthetic-places-photo-{index}".encode(),
+                "source": "places",
+                "content_type": "image/jpeg",
+                "area_id": f"places_photo_{index}",
+                "file_name": f"places-photo-{index}.jpg",
+            }
+            for index in range(min(6, max_photos))
+        ]
     async with httpx.AsyncClient() as client:
         details = await client.get(
             "https://maps.googleapis.com/maps/api/place/details/json",
             params={"place_id": place_id, "fields": "photos", "key": api_key},
         )
-        photo_refs = [photo["photo_reference"] for photo in details.json()["result"].get("photos", [])][:max_photos]
-        images: list[bytes] = []
-        for reference in photo_refs:
+        photo_refs = [photo["photo_reference"] for photo in details.json().get("result", {}).get("photos", [])][:max_photos]
+        images: list[dict] = []
+        for index, reference in enumerate(photo_refs, start=1):
             response = await client.get(
                 "https://maps.googleapis.com/maps/api/place/photo",
                 params={"photo_reference": reference, "maxwidth": 1600, "key": api_key},
             )
             if response.status_code == 200:
-                images.append(response.content)
+                content_type = _content_type_from_response(response)
+                images.append(
+                    {
+                        "bytes": response.content,
+                        "source": "places",
+                        "content_type": content_type,
+                        "area_id": f"places_photo_{index}",
+                        "file_name": f"places-photo-{index}{_extension_for(content_type)}",
+                    }
+                )
         return images
 
 
@@ -79,4 +129,3 @@ async def fetch_osm_building(lat: float, lng: float) -> dict:
                     }
                 ]
             }
-

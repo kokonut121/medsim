@@ -10,6 +10,7 @@ Domain = Literal["ICA", "MSA", "FRA", "ERA", "PFA", "SCA"]
 Severity = Literal["CRITICAL", "HIGH", "ADVISORY"]
 ModelStatus = Literal["queued", "acquiring", "classifying", "generating", "ready", "failed"]
 ScanStatus = Literal["queued", "running", "synthesizing", "complete", "failed"]
+ImageSource = Literal["street_view", "places", "supplemental_upload", "world_labs"]
 
 
 class SpatialAnchor(BaseModel):
@@ -56,6 +57,7 @@ class CoverageArea(BaseModel):
     area_id: str
     source: str
     image_count: int
+    category: str | None = None
 
 
 class GapArea(BaseModel):
@@ -67,6 +69,21 @@ class CoverageMap(BaseModel):
     facility_id: str
     covered_areas: list[CoverageArea]
     gap_areas: list[GapArea]
+    updated_at: datetime | None = None
+
+
+class ImageMeta(BaseModel):
+    image_id: str
+    facility_id: str
+    source: ImageSource
+    r2_key: str
+    public_url: str
+    category: str | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    heading: int | None = None
+    notes: str | None = None
+    content_type: str = "image/jpeg"
+    created_at: datetime
 
 
 class Facility(BaseModel):
@@ -97,6 +114,11 @@ class WorldModel(BaseModel):
     splat_r2_key: str
     scene_graph_json: dict
     world_labs_world_id: str
+    source_image_count: int = 0
+    failure_reason: str | None = None
+    caption: str | None = None
+    thumbnail_url: str | None = None
+    world_marble_url: str | None = None
     created_at: datetime
     completed_at: datetime | None = None
 
@@ -104,4 +126,10 @@ class WorldModel(BaseModel):
 class FacilityCreate(BaseModel):
     name: str
     address: str
-
+    unit_name: str | None = None
+    unit_type: str | None = None
+    floor: int = 1
+    lat: float | None = None
+    lng: float | None = None
+    google_place_id: str | None = None
+    osm_building_id: str | None = None

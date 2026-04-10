@@ -12,6 +12,8 @@ router = APIRouter(prefix="/api/scans", tags=["scans"])
 @router.post("/{unit_id}/run")
 async def trigger_scan(unit_id: str):
     model = iris_client.get_model(unit_id)
+    if model.status != "ready":
+        raise HTTPException(status_code=409, detail=f"Model is {model.status}")
     return await run_scan(unit_id, model.model_id)
 
 
@@ -42,4 +44,3 @@ async def get_finding(unit_id: str, finding_id: str):
     if finding.scan_id not in iris_client.scans:
         raise HTTPException(status_code=404, detail="Scan not found")
     return finding
-

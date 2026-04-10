@@ -8,12 +8,16 @@ export function CoverageMap({ coverageMap }: { coverageMap: CoverageMapType | nu
       <div className="coverage-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
         <div className="feed-card">
           <strong>Covered areas</strong>
+          <p className="muted" style={{ marginTop: 8 }}>
+            Last updated {coverageMap?.updated_at ? new Date(coverageMap.updated_at).toLocaleString() : "pending"}
+          </p>
           <table>
             <tbody>
               {(coverageMap?.covered_areas ?? []).map((area) => (
                 <tr key={area.area_id}>
                   <td>{area.area_id}</td>
                   <td>{area.source}</td>
+                  <td>{area.category ?? "unclassified"}</td>
                   <td>{area.image_count} images</td>
                 </tr>
               ))}
@@ -37,4 +41,3 @@ export function CoverageMap({ coverageMap }: { coverageMap: CoverageMapType | nu
     </div>
   );
 }
-

@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from backend.models import CoverageMap, Facility, FacilityCreate, Finding, GapArea, Scan, Unit, WorldModel
+from backend.models import CoverageArea, CoverageMap, Facility, FacilityCreate, Finding, GapArea, ImageMeta, Scan, Unit, WorldModel
 
 
 UTC = timezone.utc
@@ -26,8 +26,11 @@ class IRISClient:
         self.units: dict[str, Unit] = {}
         self.models: dict[str, WorldModel] = {}
         self.scans: dict[str, Scan] = {}
+        self.images: dict[str, ImageMeta] = {}
+        self.images_by_facility: defaultdict[str, list[str]] = defaultdict(list)
         self.findings_by_scan: defaultdict[str, list[Finding]] = defaultdict(list)
         self.coverage_maps: dict[str, CoverageMap] = {}
+        self.upload_sessions: dict[str, dict] = {}
         self._seed_demo_data()
 
     def _seed_demo_data(self) -> None:
@@ -106,13 +109,14 @@ class IRISClient:
         self.coverage_maps[facility_id] = CoverageMap(
             facility_id=facility_id,
             covered_areas=[
-                {"area_id": "main_entrance", "source": "street_view", "image_count": 8},
-                {"area_id": "lobby", "source": "places_photos", "image_count": 11},
+                CoverageArea(area_id="main_entrance", source="street_view", image_count=8, category="building_exterior"),
+                CoverageArea(area_id="lobby", source="places_photos", image_count=11, category="lobby_main_entrance"),
             ],
             gap_areas=[
                 GapArea(area_id="icu_corridor_west", description="Interior corridor imagery missing"),
                 GapArea(area_id="med_room_2", description="Medication preparation zone not visible"),
             ],
+            updated_at=created_at,
         )
 
     def list_facilities(self) -> list[Facility]:
@@ -124,11 +128,11 @@ class IRISClient:
             facility_id=facility_id,
             name=payload.name,
             address=payload.address,
-            lat=41.881,
-            lng=-87.623,
+            lat=getattr(payload, "lat", None) or 41.881,
+            lng=getattr(payload, "lng", None) or -87.623,
             org_id="org_demo",
-            google_place_id=f"place_{facility_id}",
-            osm_building_id=f"osm_{facility_id}",
+            google_place_id=getattr(payload, "google_place_id", None) or f"place_{facility_id}",
+            osm_building_id=getattr(payload, "osm_building_id", None) or f"osm_{facility_id}",
             created_at=utcnow(),
         )
         self.facilities[facility_id] = created
@@ -136,15 +140,16 @@ class IRISClient:
         self.units[unit_id] = Unit(
             unit_id=unit_id,
             facility_id=facility_id,
-            name="Medical-Surgical Unit",
-            floor=3,
-            unit_type="MedSurg",
+            name=payload.unit_name or "Trauma Center",
+            floor=payload.floor,
+            unit_type=payload.unit_type or "Trauma",
             created_at=utcnow(),
         )
         self.coverage_maps[facility_id] = CoverageMap(
             facility_id=facility_id,
             covered_areas=[],
             gap_areas=[GapArea(area_id="facility_pending", description="Imagery acquisition not started")],
+            updated_at=utcnow(),
         )
         return created
 
@@ -162,25 +167,130 @@ class IRISClient:
         doomed_models = [model_id for model_id, model in self.models.items() if model.unit_id in doomed_units]
         for model_id in doomed_models:
             self.models.pop(model_id, None)
+        doomed_images = self.images_by_facility.pop(facility_id, [])
+        for image_id in doomed_images:
+            self.images.pop(image_id, None)
         self.coverage_maps.pop(facility_id, None)
 
     def get_coverage(self, facility_id: str) -> CoverageMap:
         return self.coverage_maps[facility_id]
 
-    def write_world_model(self, facility_id: str, world_model: dict) -> WorldModel:
-        unit = next(unit for unit in self.units.values() if unit.facility_id == facility_id)
+    def get_unit_for_facility(self, facility_id: str) -> Unit:
+        return next(unit for unit in self.units.values() if unit.facility_id == facility_id)
+
+    def create_or_replace_model(self, facility_id: str, *, status: str = "queued") -> WorldModel:
+        unit = self.get_unit_for_facility(facility_id)
         model = WorldModel(
             model_id=f"model_{uuid4().hex[:8]}",
+            unit_id=unit.unit_id,
+            status=status,
+            splat_r2_key="",
+            scene_graph_json={},
+            world_labs_world_id="",
+            created_at=utcnow(),
+        )
+        self.models[model.model_id] = model
+        return model
+
+    def update_model(
+        self,
+        model_id: str,
+        *,
+        status: str | None = None,
+        splat_r2_key: str | None = None,
+        scene_graph_json: dict | None = None,
+        world_labs_world_id: str | None = None,
+        source_image_count: int | None = None,
+        failure_reason: str | None = None,
+        caption: str | None = None,
+        thumbnail_url: str | None = None,
+        world_marble_url: str | None = None,
+        completed_at: datetime | None = None,
+    ) -> WorldModel:
+        model = self.models[model_id]
+        updates = model.model_dump()
+        if status is not None:
+            updates["status"] = status
+        if splat_r2_key is not None:
+            updates["splat_r2_key"] = splat_r2_key
+        if scene_graph_json is not None:
+            updates["scene_graph_json"] = scene_graph_json
+        if world_labs_world_id is not None:
+            updates["world_labs_world_id"] = world_labs_world_id
+        if source_image_count is not None:
+            updates["source_image_count"] = source_image_count
+        if failure_reason is not None:
+            updates["failure_reason"] = failure_reason
+        if caption is not None:
+            updates["caption"] = caption
+        if thumbnail_url is not None:
+            updates["thumbnail_url"] = thumbnail_url
+        if world_marble_url is not None:
+            updates["world_marble_url"] = world_marble_url
+        if completed_at is not None:
+            updates["completed_at"] = completed_at
+        self.models[model_id] = WorldModel.model_validate(updates)
+        return self.models[model_id]
+
+    def write_world_model(self, facility_id: str, world_model: dict, model_id: str | None = None) -> WorldModel:
+        unit = next(unit for unit in self.units.values() if unit.facility_id == facility_id)
+        model = self.models.get(model_id) if model_id else None
+        created_at = model.created_at if model else utcnow()
+        ready_model = WorldModel(
+            model_id=model.model_id if model else f"model_{uuid4().hex[:8]}",
             unit_id=unit.unit_id,
             status="ready",
             splat_r2_key=world_model["splat_url"],
             scene_graph_json=world_model["scene_manifest"],
             world_labs_world_id=world_model["world_id"],
-            created_at=utcnow(),
+            source_image_count=world_model.get("source_image_count", 0),
+            caption=world_model.get("caption"),
+            thumbnail_url=world_model.get("thumbnail_url"),
+            world_marble_url=world_model.get("world_marble_url"),
+            created_at=created_at,
             completed_at=utcnow(),
         )
-        self.models[model.model_id] = model
-        return model
+        self.models[ready_model.model_id] = ready_model
+        return ready_model
+
+    def write_image_meta(self, image_meta: ImageMeta) -> ImageMeta:
+        self.images[image_meta.image_id] = image_meta
+        self.images_by_facility[image_meta.facility_id].append(image_meta.image_id)
+        return image_meta
+
+    def update_image_classification(self, image_id: str, *, category: str, confidence: float, notes: str | None = None) -> ImageMeta:
+        image = self.images[image_id]
+        updates = image.model_dump()
+        updates["category"] = category
+        updates["confidence"] = confidence
+        updates["notes"] = notes
+        self.images[image_id] = ImageMeta.model_validate(updates)
+        return self.images[image_id]
+
+    def list_images_for_facility(self, facility_id: str) -> list[ImageMeta]:
+        return [self.images[image_id] for image_id in self.images_by_facility.get(facility_id, [])]
+
+    def update_coverage(self, facility_id: str, covered_areas: list[CoverageArea], gap_areas: list[GapArea]) -> CoverageMap:
+        coverage = CoverageMap(
+            facility_id=facility_id,
+            covered_areas=covered_areas,
+            gap_areas=gap_areas,
+            updated_at=utcnow(),
+        )
+        self.coverage_maps[facility_id] = coverage
+        return coverage
+
+    def create_upload_session(self, upload_id: str, payload: dict) -> dict:
+        self.upload_sessions[upload_id] = payload
+        return self.upload_sessions[upload_id]
+
+    def get_upload_session(self, upload_id: str) -> dict:
+        return self.upload_sessions[upload_id]
+
+    def update_upload_session(self, upload_id: str, **updates: object) -> dict:
+        session = self.upload_sessions[upload_id]
+        session.update(updates)
+        return session
 
     def write_findings(self, scan: Scan, findings: list[Finding]) -> Scan:
         scan.findings = findings
@@ -217,4 +327,3 @@ class IRISClient:
 
 
 iris_client = IRISClient()
-

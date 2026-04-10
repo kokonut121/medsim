@@ -12,6 +12,7 @@ Implementation scaffold for the MedSentinel PRD: a hospital safety platform that
 ## Quick Start
 
 1. Create a virtual environment and install `backend/requirements.txt`.
-2. Install dependencies in `frontend/` and run `npm run build`.
-3. Start the backend with `uvicorn backend.main:app --reload`.
-4. Start the frontend with `npm run dev` inside `frontend/`.
+2. Copy `.env.example` to `.env` and fill in Google, World Labs, Cloudflare R2, and Mapbox credentials.
+3. Install dependencies in `frontend/` and run `npm run build`.
+4. Start the backend with `./scripts/start-backend.sh`.
+5. Start the frontend with `npm run dev` inside `frontend/`.

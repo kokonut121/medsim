@@ -152,10 +152,24 @@ input {
   min-height: 620px;
   overflow: hidden;
   position: relative;
+  padding: 0;
 }
 
-.mock-splat {
+.viewer-canvas,
+.viewer-placeholder {
   min-height: 620px;
+  width: 100%;
+  height: 100%;
+}
+
+.viewer-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.viewer-placeholder {
+  position: relative;
+  z-index: 1;
   padding: 24px;
   display: grid;
   align-items: end;
@@ -237,4 +251,3 @@ th {
     grid-template-columns: 1fr;
   }
 }
-

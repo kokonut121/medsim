@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     google_geocoding_api_key: str = ""
     world_labs_api_key: str = ""
+    world_labs_api_base: str = "https://api.worldlabs.ai"
     anthropic_api_key: str = ""
     openai_api_key: str = ""
     modal_token_id: str = ""
@@ -32,12 +33,12 @@ class Settings(BaseSettings):
     r2_secret_access_key: str = ""
     r2_bucket_name: str = "medsent-assets"
     r2_public_url: str = "https://example.r2.dev"
+    use_synthetic_fallbacks: bool = Field(default=False, alias="MEDSENTINEL_USE_SYNTHETIC_FALLBACKS")
     next_public_mapbox_token: str = ""
-    next_public_ws_url: str = "ws://localhost:8000"
-    next_public_api_url: str = "http://localhost:8000"
+    next_public_ws_url: str = "ws://127.0.0.1:8000"
+    next_public_api_url: str = "http://127.0.0.1:8000"
 
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
-

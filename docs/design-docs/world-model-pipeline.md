@@ -11,3 +11,6 @@ The pipeline follows the PRD sequence:
 
 Current implementation uses deterministic synthetic fallbacks for acquisition, classification, and world generation so downstream flows remain testable without live credentials.
 
+Phase 1 now prefers real Google Geocoding, Street View, Places photo, Cloudflare R2 asset storage, and World Labs world generation when credentials are present.
+
+Synthetic behavior remains available behind `MEDSENTINEL_USE_SYNTHETIC_FALLBACKS=true` for local or test workflows that should avoid external services.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AgentActivityRibbon } from "@/components/findings/AgentActivityRibbon";
 import { FindingFeed } from "@/components/findings/FindingFeed";
@@ -15,17 +15,28 @@ export function ModelClient({ unitId, initialScan }: { unitId: string; initialSc
   const findings = useStore((state) => state.findings);
   const setFindings = useStore((state) => state.setFindings);
   const selectedFindingId = useStore((state) => state.selectedFindingId);
-  const { signedUrl } = useSplatModel(unitId);
+  const { signedUrl, status, loading, error } = useSplatModel(unitId);
+  const triggeredScan = useRef(false);
+  const [scan, setScan] = useState<Scan | null>(initialScan);
 
   useScanStream(unitId);
 
   useEffect(() => {
-    if (initialScan) {
-      setFindings(initialScan.findings);
+    if (status?.status !== "ready" || triggeredScan.current) {
       return;
     }
-    void api.runScan(unitId).then((scan) => setFindings(scan.findings));
-  }, [initialScan, setFindings, unitId]);
+    if (initialScan) {
+      setFindings(initialScan.findings);
+      setScan(initialScan);
+      triggeredScan.current = true;
+      return;
+    }
+    triggeredScan.current = true;
+    void api.runScan(unitId).then((nextScan) => {
+      setFindings(nextScan.findings);
+      setScan(nextScan);
+    });
+  }, [initialScan, setFindings, status?.status, unitId]);
 
   const selectedLabel = useMemo(
     () => findings.find((finding) => finding.finding_id === selectedFindingId)?.label_text ?? null,
@@ -34,12 +45,20 @@ export function ModelClient({ unitId, initialScan }: { unitId: string; initialSc
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
+      {status?.status !== "ready" ? (
+        <div className="panel">
+          <div className="eyebrow">Model generation</div>
+          <h2 style={{ margin: "8px 0 10px" }}>{loading ? "Checking model state..." : `Status: ${status?.status ?? "unknown"}`}</h2>
+          <p className="muted" style={{ marginBottom: 0 }}>
+            {status?.failure_reason ?? error ?? "The viewer will activate automatically once the world model is ready."}
+          </p>
+        </div>
+      ) : null}
       <div className="viewer-layout">
         <SplatRenderer signedUrl={signedUrl} findings={findings} selectedLabel={selectedLabel} />
         <FindingFeed />
       </div>
-      <AgentActivityRibbon scan={initialScan} />
+      <AgentActivityRibbon scan={scan} />
     </div>
   );
 }
-
