@@ -10,3 +10,4 @@ coverage
 .DS_Store
 frontend/.next
 frontend/node_modules
+scripts/vr_frames/
