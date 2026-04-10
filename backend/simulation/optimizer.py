@@ -58,7 +58,14 @@ Dead zones (rooms agents rarely/never needed):
 
 ---
 
-Based on this swarm data, produce an optimized layout plan.
+IMPORTANT CONSTRAINT: The building structure (walls, rooms, corridors) is FIXED and cannot change.
+You may ONLY recommend moving equipment and furniture that can physically be relocated:
+crash carts, hand hygiene dispensers, ADCs (medication dispensers), workstations,
+IV poles, monitors, chairs, supply carts. Do NOT suggest demolishing walls, merging rooms,
+or changing room sizes. Room adjacency changes should only mean adding a door or clear path,
+not structural work.
+
+Based on this swarm data, produce an optimized equipment placement plan.
 Respond with this exact JSON schema:
 
 {{
@@ -66,10 +73,10 @@ Respond with this exact JSON schema:
     {{"location": "...", "cause": "...", "severity": "critical|high|medium", "affected_roles": [...]}}
   ],
   "equipment_relocations": [
-    {{"equipment": "...", "current_position": "...", "recommended_position": "...", "reason": "..."}}
+    {{"equipment": "...", "current_room": "...", "recommended_room": "...", "recommended_position": "...", "reason": "..."}}
   ],
   "room_adjacency_changes": [
-    {{"room_a": "...", "room_b": "...", "change": "make_adjacent|increase_clearance|add_direct_path", "reason": "..."}}
+    {{"room_a": "...", "room_b": "...", "change": "add_door|add_direct_path|improve_clearance", "reason": "..."}}
   ],
   "dead_zone_repurposing": [
     {{"zone": "...", "recommended_use": "...", "reason": "..."}}

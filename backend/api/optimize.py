@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 
 from backend.db.iris_client import iris_client
 from backend.db.r2_client import r2_client
-from backend.pipeline.fal_generator import generate_floor_plan
+from backend.pipeline.floor_plan_renderer import render_floor_plan, render_optimized_floor_plan
 from backend.simulation.optimizer import optimize_layout
 from backend.simulation.swarm import run_swarm
 
@@ -17,11 +17,11 @@ async def run_optimization(unit_id: str, agents_per_role: int = 5):
     """
     Run swarm simulation + gpt-4o reasoning on the world model for a unit.
 
-    1. Pulls the current scene graph from the world model.
-    2. Runs `agents_per_role × 6` gpt-4o-mini swarm agents in parallel.
-    3. Feeds aggregated swarm data to gpt-4o for layout optimization reasoning.
-    4. Regenerates the floor plan via fal.ai using the optimized layout description.
-    5. Stores the optimized floor plan back in R2 and returns the full result.
+    1. Renders the current floor plan deterministically from the scene graph (fixed walls).
+    2. Runs agents_per_role × 6 gpt-4o-mini swarm agents in parallel.
+    3. Feeds aggregated swarm data to gpt-4o — only equipment/furniture moves suggested.
+    4. Renders the optimized floor plan with identical room geometry, moved equipment only.
+    5. Stores both before/after to R2 and returns full diff.
     """
     try:
         model = iris_client.get_model(unit_id)
@@ -39,41 +39,35 @@ async def run_optimization(unit_id: str, agents_per_role: int = 5):
     )
     facility_name = facility.name if facility else unit_id
 
-    # 1. Swarm simulation
-    swarm_report = await run_swarm(
-        scene_graph,
-        facility_name,
-        agents_per_role=agents_per_role,
-    )
+    # 1. Render BEFORE — fixed architecture, current equipment positions
+    before_bytes = render_floor_plan(scene_graph, title=f"{facility_name} — Current Layout")
+    before_key = f"facilities/{unit_id}/floor_plan_before.png"
+    r2_client.upload_bytes(before_key, before_bytes, content_type="image/png")
+    before_url = r2_client.public_url_for(before_key)
 
-    # 2. Reasoning layer
+    # 2. Swarm simulation
+    swarm_report = await run_swarm(scene_graph, facility_name, agents_per_role=agents_per_role)
+
+    # 3. Reasoning layer (equipment moves only)
     optimization = await optimize_layout(scene_graph, swarm_report)
+    equipment_relocations = optimization.get("equipment_relocations", [])
 
-    # 3. Regenerate floor plan with optimized layout prompt
-    floor_plan_prompt_override = optimization.get("floor_plan_prompt")
-    if floor_plan_prompt_override:
-        floor_plan_bytes = await generate_floor_plan(
-            optimization.get("optimized_scene_graph", scene_graph),
-            facility_name,
-            prompt_override=floor_plan_prompt_override,
-        )
-    else:
-        floor_plan_bytes = await generate_floor_plan(
-            optimization.get("optimized_scene_graph", scene_graph),
-            facility_name,
-        )
+    # 4. Render AFTER — identical room geometry, equipment moved
+    after_bytes = render_optimized_floor_plan(
+        scene_graph,
+        equipment_relocations,
+        title=f"{facility_name} — Optimized Layout",
+    )
+    after_key = f"facilities/{unit_id}/floor_plan_after.png"
+    r2_client.upload_bytes(after_key, after_bytes, content_type="image/png")
+    after_url = r2_client.public_url_for(after_key)
 
-    # 4. Store optimized floor plan in R2
-    key = f"facilities/{unit_id}/floor_plan_optimized.png"
-    r2_client.upload_bytes(key, floor_plan_bytes, content_type="image/png")
-    optimized_floor_plan_url = r2_client.public_url_for(key)
-
-    # 5. Patch the optimized scene graph with the new floor plan URL
-    optimized_sg = optimization.get("optimized_scene_graph", scene_graph)
-    optimized_sg["floor_plan_url"] = optimized_floor_plan_url
+    # 5. Update model scene graph
+    optimized_sg = dict(scene_graph)
+    optimized_sg["floor_plan_url"] = after_url
+    optimized_sg["floor_plan_before_url"] = before_url
+    optimized_sg["equipment_relocations"] = equipment_relocations
     optimized_sg["optimized"] = True
-
-    # Update the model's scene graph so reports pick up the optimized layout
     iris_client.update_model(model.model_id, scene_graph_json=optimized_sg)
 
     return {
@@ -84,9 +78,10 @@ async def run_optimization(unit_id: str, agents_per_role: int = 5):
         "efficiency_gain_estimate": optimization.get("efficiency_gain_estimate"),
         "summary": optimization.get("summary"),
         "bottleneck_analysis": optimization.get("bottleneck_analysis", []),
-        "equipment_relocations": optimization.get("equipment_relocations", []),
+        "equipment_relocations": equipment_relocations,
         "room_adjacency_changes": optimization.get("room_adjacency_changes", []),
         "dead_zone_repurposing": optimization.get("dead_zone_repurposing", []),
-        "optimized_floor_plan_url": optimized_floor_plan_url,
+        "before_floor_plan_url": before_url,
+        "after_floor_plan_url": after_url,
         "swarm_report": swarm_report.to_dict(),
     }
