@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     r2_secret_access_key: str = ""
     r2_bucket_name: str = "medsent-assets"
     r2_public_url: str = "https://example.r2.dev"
+    fal_key: str = ""
     use_synthetic_fallbacks: bool = Field(default=False, alias="MEDSENTINEL_USE_SYNTHETIC_FALLBACKS")
     next_public_mapbox_token: str = ""
     next_public_ws_url: str = "ws://127.0.0.1:8000"
