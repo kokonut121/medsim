@@ -10,7 +10,7 @@ import json
 import pytest
 
 from backend.pipeline.scene_graph import extract_scene_graph
-from backend.pipeline.classify import classify_images
+from backend.pipeline.classify import classify_image
 from backend.pipeline.image_acquisition import fetch_street_view, fetch_places_photos
 from backend.pipeline.world_model import generate_world_model
 
@@ -65,34 +65,38 @@ def test_fetch_places_photos_synthetic_returns_images():
 
 
 # ---------------------------------------------------------------------------
-# Classification — synthetic path
+# Classification — synthetic path (classify_image is per-image)
 # ---------------------------------------------------------------------------
 
-def test_classify_images_returns_one_result_per_input():
-    raw = [
-        {"bytes": b"fake-jpeg-data", "source": "street_view", "heading": 0,
-         "content_type": "image/jpeg", "area_id": "sv_0", "file_name": "sv-0.jpg"}
-    ]
-    results = asyncio.get_event_loop().run_until_complete(
-        classify_images(raw, facility_id="fac_test", api_key="")
+def test_classify_image_street_view():
+    result = asyncio.get_event_loop().run_until_complete(
+        classify_image(b"fake-jpeg", "street_view", {"heading": 0})
     )
-    assert len(results) == len(raw)
+    assert result["category"] == "building_exterior"
+    assert 0.0 <= result["confidence"] <= 1.0
+    assert result["source"] == "street_view"
 
 
-def test_classify_images_schema():
-    raw = [
-        {"bytes": b"fake", "source": "street_view", "heading": h,
-         "content_type": "image/jpeg", "area_id": f"sv_{h}", "file_name": f"sv-{h}.jpg"}
-        for h in [0, 90]
-    ]
-    results = asyncio.get_event_loop().run_until_complete(
-        classify_images(raw, facility_id="fac_test", api_key="")
+def test_classify_image_places():
+    result = asyncio.get_event_loop().run_until_complete(
+        classify_image(b"fake-jpeg", "places", {"index": 1})
     )
-    for r in results:
-        assert "category" in r
-        assert "confidence" in r
-        assert 0.0 <= r["confidence"] <= 1.0
-        assert "public_url" in r
+    assert result["category"] == "lobby_main_entrance"
+    assert 0.0 <= result["confidence"] <= 1.0
+
+
+def test_classify_image_ed_entrance_heading():
+    result = asyncio.get_event_loop().run_until_complete(
+        classify_image(b"fake-jpeg", "street_view", {"heading": 180})
+    )
+    assert result["category"] == "ed_entrance_ambulance_bay"
+
+
+def test_classify_image_supplemental_upload():
+    result = asyncio.get_event_loop().run_until_complete(
+        classify_image(b"fake-jpeg", "supplemental_upload", {})
+    )
+    assert result["category"] == "patient_room"
 
 
 # ---------------------------------------------------------------------------

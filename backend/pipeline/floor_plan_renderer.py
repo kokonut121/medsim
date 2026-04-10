@@ -83,64 +83,102 @@ class RoomRect:
     sightline: bool = False
 
 
+_CELL_W = 2.8   # plot units per grid column
+_CELL_H = 2.4   # plot units per grid row
+_GAP    = 0.5   # separation between rooms (never touching)
+
+
 def _estimate_size(area_sqft: float) -> tuple[float, float]:
     """Convert sqft estimate to plot units (1 unit ≈ 10 ft)."""
     side = math.sqrt(max(area_sqft, 80)) / 10
+    if area_sqft >= 500:
+        return (side * 1.5, side * 0.7)
     if area_sqft >= 300:
-        return (side * 1.4, side * 0.8)
-    return (side, side)
+        return (side * 1.2, side * 0.9)
+    return (side * 0.95, side * 0.95)
 
 
 def _layout_rooms(rooms: list[dict]) -> list[RoomRect]:
     """
-    Place rooms in a grid layout respecting adjacency hints.
-    Corridors are placed as wide horizontal strips.
+    Place rooms using explicit grid_col / grid_row when available.
+    Rooms that have matching grid positions are laid out on a fixed grid;
+    any remaining rooms fall back to auto-layout after the grid section.
+    Rooms are always separated by _GAP — they never share a wall.
     """
     if not rooms:
         return []
 
-    placed: dict[str, RoomRect] = {}
-    cols = max(3, math.ceil(math.sqrt(len(rooms))))
-    grid_x, grid_y = 0.5, 0.5
-    col, row = 0, 0
-    row_height = 0.0
+    # Separate grid-positioned from free rooms
+    grid_rooms = [r for r in rooms if "grid_col" in r and "grid_row" in r]
+    free_rooms  = [r for r in rooms if "grid_col" not in r or "grid_row" not in r]
 
-    for room in rooms:
+    placed: dict[str, RoomRect] = {}
+
+    # --- Grid-positioned rooms ---
+    for room in grid_rooms:
+        gc = int(room["grid_col"])
+        gr = int(room["grid_row"])
         area = room.get("area_sqft_estimate", 150)
         w, h = _estimate_size(area)
 
-        # Corridors span full width
+        # Corridors are always wide + short
         if room.get("type") in ("corridor_hallway", "ed_entrance_ambulance_bay"):
-            if col > 0:
-                row += 1
-                grid_x = 0.5
-                grid_y += row_height + 0.3
-                row_height = 0.0
-                col = 0
-            w = cols * 2.2
-            h = 0.9
+            # Span multiple columns if desired; for now use fixed width from area
+            w = max(w, _CELL_W * 3)
+            h = min(h, 1.1)
+
+        cx = 0.5 + gc * (_CELL_W + _GAP)
+        cy = 0.5 + gr * (_CELL_H + _GAP)
 
         rect = RoomRect(
             room_id=room["room_id"],
             room_type=room.get("type", "other"),
-            x=grid_x,
-            y=grid_y,
+            x=cx,
+            y=cy,
             w=w,
             h=h,
-            equipment=room.get("equipment", []),
+            equipment=list(room.get("equipment", [])),
             sightline=room.get("sightline_to_nursing_station", False),
         )
         placed[room["room_id"]] = rect
 
-        grid_x += w + 0.3
-        row_height = max(row_height, h)
-        col += 1
-        if col >= cols and room.get("type") not in ("corridor_hallway",):
-            col = 0
-            row += 1
-            grid_x = 0.5
-            grid_y += row_height + 0.3
-            row_height = 0.0
+    # --- Auto-layout for rooms without grid positions ---
+    if free_rooms:
+        max_gc = max((int(r["grid_col"]) for r in grid_rooms), default=-1)
+        auto_start_x = 0.5 + (max_gc + 1) * (_CELL_W + _GAP)
+        auto_y = 0.5
+        auto_x = auto_start_x
+        auto_cols = max(3, math.ceil(math.sqrt(len(free_rooms))))
+        auto_col  = 0
+        auto_row_h = 0.0
+
+        for room in free_rooms:
+            area = room.get("area_sqft_estimate", 150)
+            w, h = _estimate_size(area)
+            if room.get("type") in ("corridor_hallway", "ed_entrance_ambulance_bay"):
+                w = auto_cols * (_CELL_W + _GAP)
+                h = 1.1
+
+            rect = RoomRect(
+                room_id=room["room_id"],
+                room_type=room.get("type", "other"),
+                x=auto_x,
+                y=auto_y,
+                w=w,
+                h=h,
+                equipment=list(room.get("equipment", [])),
+                sightline=room.get("sightline_to_nursing_station", False),
+            )
+            placed[room["room_id"]] = rect
+
+            auto_x += w + _GAP
+            auto_row_h = max(auto_row_h, h)
+            auto_col += 1
+            if auto_col >= auto_cols:
+                auto_col = 0
+                auto_y += auto_row_h + _GAP
+                auto_x  = auto_start_x
+                auto_row_h = 0.0
 
     return list(placed.values())
 
