@@ -72,7 +72,7 @@ export function SplatRenderer({
           cameraUp:               [0, 1, 0],
           initialCameraPosition:  [0, 1, 3],
           initialCameraLookAt:    [0, 0.5, 0],
-          gpuAcceleratedSort:     true,
+          gpuAcceleratedSort:     false,
           sharedMemoryForWorkers: false,
           antialiased:            true,
         });
