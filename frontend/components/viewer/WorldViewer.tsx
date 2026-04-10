@@ -309,7 +309,9 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
         });
 
         await viewer.addSplatScene(splatUrl, {
-          format: splatUrl.endsWith(".spz") || splatUrl.endsWith(".bin")
+          // Force .spz for all proxy/stream URLs — they don't end in .spz but they're always .spz
+          format: (splatUrl.endsWith(".spz") || splatUrl.endsWith(".bin") ||
+                   splatUrl.includes("/splat/stream") || splatUrl.includes("/splat/"))
             ? GS3D.SceneFormat.Spz
             : undefined,
           showLoadingUI:             false,

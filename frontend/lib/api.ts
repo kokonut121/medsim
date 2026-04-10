@@ -52,7 +52,7 @@ export const api = {
   getScanStatus: (unitId: string) => parse<Scan>(`/api/scans/${unitId}/status`),
   getFindings: (unitId: string) => parse<Finding[]>(`/api/scans/${unitId}/findings`),
   getSceneGraph: (unitId: string) => parse<Record<string, unknown>>(`/api/models/${unitId}/scene_graph`),
-  getSplat: (unitId: string) => parse<{ signed_url: string }>(`/api/models/${unitId}/splat`),
+  getSplat: (unitId: string) => parse<{ signed_url: string; stream_url?: string }>(`/api/models/${unitId}/splat`),
   runSimulation: (unitId: string, scenarioPrompt: string, agentsPerRole = 3) =>
     parse<RunSimulationResponse>(`/api/simulate/${unitId}/run`, {
       method: "POST",
