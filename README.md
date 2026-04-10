@@ -2,9 +2,7 @@
 
 > AI World Model + Agent Orchestration Network for Hospital Safety & Operations Intelligence
 
-MedSentinel automatically acquires public imagery of any hospital, generates a navigable 3D Gaussian-splat world model, then deploys six specialized AI agent teams into that model to identify and spatially annotate critical safety risks. Findings stream in real time to a Next.js viewer and are exportable as PDF and FHIR R4 DiagnosticReport artifacts.
-
-Directly adapted from **Orca** (HackIllinois 2026 Best Voyager Hack), extended with hospital-domain agent specialization and InterSystems IRIS for Health as a HIPAA-grade data security backbone.
+Built for **Harvard's HSIL Hackathon**. MedSentinel automatically acquires public imagery of any hospital, generates a navigable 3D Gaussian-splat world model, then deploys six specialized AI agent teams into that model to identify and spatially annotate critical safety risks. Findings stream in real time to a Next.js viewer and are exportable as PDF and FHIR R4 DiagnosticReport artifacts, all secured through InterSystems IRIS for Health.
 
 ---
 
