@@ -68,22 +68,19 @@ export function SplatRenderer({
         if (disposed) return;
 
         const viewer = new GS3D.Viewer({
-          rootElement: splatEl,
-          cameraUp: [0, -1, -0.6],
-          initialCameraPosition: [-1, -2, 5],
-          initialCameraLookAt: [0, 1, 0],
-          gpuAcceleratedSort: true,
+          rootElement:            splatEl,
+          cameraUp:               [0, 1, 0],
+          initialCameraPosition:  [0, 1, 3],
+          initialCameraLookAt:    [0, 0.5, 0],
+          gpuAcceleratedSort:     true,
           sharedMemoryForWorkers: false,
-          antialiased: true,
+          antialiased:            true,
         });
 
         await viewer.addSplatScene(signedUrl, {
-          // Force .spz format for all our proxy/stream URLs; fall back to auto-detect
-          format: isSpzUrl(signedUrl) ? GS3D.SceneFormat?.Spz : undefined,
-          showLoadingUI: false,
-          splatAlphaRemovalThreshold: 5,
-          position: [0, 1, 0],
-          scale: [1.2, 1.2, 1.2],
+          format:                     isSpzUrl(signedUrl) ? GS3D.SceneFormat?.Spz : undefined,
+          showLoadingUI:              false,
+          splatAlphaRemovalThreshold: 1,
         });
 
         if (disposed) { viewer.dispose?.(); return; }

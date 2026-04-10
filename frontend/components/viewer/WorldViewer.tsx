@@ -299,13 +299,14 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
         if (disposed) return;
 
         const viewer = new GS3D.Viewer({
-          rootElement:             splatEl,
-          cameraUp:                [0, -1, -0.6],
-          initialCameraPosition:   [-1, -2, 5],
-          initialCameraLookAt:     [0, 1, 0],
-          gpuAcceleratedSort:      true,
-          sharedMemoryForWorkers:  false,
-          antialiased:             true,
+          rootElement:            splatEl,
+          // Standard Y-up; World Labs SPZ models use conventional coordinate system
+          cameraUp:               [0, 1, 0],
+          initialCameraPosition:  [0, 1, 3],
+          initialCameraLookAt:    [0, 0.5, 0],
+          gpuAcceleratedSort:     true,
+          sharedMemoryForWorkers: false,
+          antialiased:            true,
         });
 
         await viewer.addSplatScene(splatUrl, {
@@ -314,10 +315,8 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
                    splatUrl.includes("/splat/stream") || splatUrl.includes("/splat/"))
             ? GS3D.SceneFormat.Spz
             : undefined,
-          showLoadingUI:             false,
-          splatAlphaRemovalThreshold: 5,
-          position:                  [0, 1, 0],
-          scale:                     [1.2, 1.2, 1.2],
+          showLoadingUI:              false,
+          splatAlphaRemovalThreshold: 1,
         });
 
         if (disposed) { viewer.dispose(); return; }
