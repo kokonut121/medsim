@@ -304,14 +304,15 @@ th {
   inset: 0;
   pointer-events: none;
   z-index: 10;
+  contain: layout style paint;
 }
 
 /* ── annotation pin (absolute, positioned via JS each frame) ── */
 .ann-pin {
   position: absolute;
-  transform: translate(-50%, -50%);
   cursor: pointer;
   user-select: none;
+  will-change: transform, opacity;
 }
 
 .ann-dot {
@@ -433,11 +434,10 @@ th {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  transform: translate(-50%,-50%);
   box-shadow: 0 0 6px currentColor;
   opacity: 0.85;
   pointer-events: none;
-  transition: left 0.05s linear, top 0.05s linear;
+  will-change: transform, opacity;
 }
 
 /* ── brand bar ── */

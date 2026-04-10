@@ -3,7 +3,6 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
-import mapboxgl from "mapbox-gl";
 
 import type { Facility } from "@/types";
 
@@ -16,24 +15,39 @@ export function FacilityMap({ facilities }: { facilities: Facility[] }) {
       return;
     }
 
-    mapboxgl.accessToken = token;
-    const map = new mapboxgl.Map({
-      container: mapRef.current,
-      style: "mapbox://styles/mapbox/light-v11",
-      center: facilities.length ? [facilities[0].lng, facilities[0].lat] : [-71.104, 42.362],
-      zoom: facilities.length ? 12 : 10
-    });
+    let disposed = false;
+    let removeMap: (() => void) | undefined;
 
-    facilities.forEach((facility) => {
-      const marker = new mapboxgl.Marker({ color: "#c0392b" })
-        .setLngLat([facility.lng, facility.lat])
-        .setPopup(new mapboxgl.Popup({ offset: 12 }).setHTML(`<strong>${facility.name}</strong><br/>${facility.address}`))
-        .addTo(map);
-      return marker;
+    void import("mapbox-gl").then((module) => {
+      if (disposed || !mapRef.current) {
+        return;
+      }
+
+      const mapboxgl = module.default;
+      mapboxgl.accessToken = token;
+
+      const map = new mapboxgl.Map({
+        container: mapRef.current,
+        style: "mapbox://styles/mapbox/light-v11",
+        center: facilities.length ? [facilities[0].lng, facilities[0].lat] : [-71.104, 42.362],
+        zoom: facilities.length ? 12 : 10
+      });
+
+      facilities.forEach((facility) => {
+        new mapboxgl.Marker({ color: "#c0392b" })
+          .setLngLat([facility.lng, facility.lat])
+          .setPopup(new mapboxgl.Popup({ offset: 12 }).setHTML(`<strong>${facility.name}</strong><br/>${facility.address}`))
+          .addTo(map);
+      });
+
+      removeMap = () => {
+        map.remove();
+      };
     });
 
     return () => {
-      map.remove();
+      disposed = true;
+      removeMap?.();
     };
   }, [facilities]);
 

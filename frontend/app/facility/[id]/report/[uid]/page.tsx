@@ -1,10 +1,11 @@
+import { buildApiUrl } from "@/lib/runtime";
+
 export default async function ReportPage({
   params
 }: {
   params: Promise<{ id: string; uid: string }>;
 }) {
   const { id, uid } = await params;
-  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
   return (
     <main className="shell">
@@ -15,10 +16,10 @@ export default async function ReportPage({
           Generate PDF and manifest outputs, or request the FHIR DiagnosticReport representation for unit {uid}.
         </p>
         <div className="cta-row">
-          <a className="button" href={`${apiBase}/api/reports/${uid}/pdf`}>
+          <a className="button" href={buildApiUrl(`/api/reports/${uid}/pdf`)}>
             Download PDF
           </a>
-          <a className="button secondary" href={`${apiBase}/api/reports/${uid}/manifest`}>
+          <a className="button secondary" href={buildApiUrl(`/api/reports/${uid}/manifest`)}>
             Download manifest
           </a>
         </div>

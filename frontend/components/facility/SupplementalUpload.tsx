@@ -4,10 +4,12 @@ import { useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import * as tus from "tus-js-client";
 
+import { buildApiUrl } from "@/lib/runtime";
+
 export function SupplementalUpload({ facilityId }: { facilityId: string }) {
   const [status, setStatus] = useState<string>("Select targeted gap-fill photos to upload.");
   const endpoint = useMemo(
-    () => `${process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000"}/api/upload/supplemental`,
+    () => buildApiUrl("/api/upload/supplemental"),
     []
   );
 

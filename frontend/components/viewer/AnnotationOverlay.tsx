@@ -1,9 +1,11 @@
 "use client";
 
+import { memo } from "react";
+
 import { FindingBillboard } from "@/components/viewer/FindingBillboard";
 import type { Finding } from "@/types";
 
-export function AnnotationOverlay({ findings }: { findings: Finding[] }) {
+function AnnotationOverlayComponent({ findings }: { findings: Finding[] }) {
   return (
     <>
       {findings.map((finding) => (
@@ -13,3 +15,4 @@ export function AnnotationOverlay({ findings }: { findings: Finding[] }) {
   );
 }
 
+export const AnnotationOverlay = memo(AnnotationOverlayComponent);

@@ -1,6 +1,8 @@
 "use client";
 
-export function CameraController({ selectedLabel }: { selectedLabel: string | null }) {
+import { memo } from "react";
+
+function CameraControllerComponent({ selectedLabel }: { selectedLabel: string | null }) {
   return (
     <div className="pill">
       {selectedLabel ? `Camera fly-to: ${selectedLabel}` : "Camera idle · WASD enabled in production viewer"}
@@ -8,3 +10,4 @@ export function CameraController({ selectedLabel }: { selectedLabel: string | nu
   );
 }
 
+export const CameraController = memo(CameraControllerComponent);

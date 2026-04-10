@@ -1,17 +1,30 @@
 "use client";
 
+import { useMemo } from "react";
+import { useShallow } from "zustand/shallow";
+
 import { DomainFilterBar } from "@/components/findings/DomainFilterBar";
 import { FindingCard } from "@/components/findings/FindingCard";
 import { useStore } from "@/store";
 
 export function FindingFeed() {
-  const findings = useStore((state) => state.findings);
-  const activeDomains = useStore((state) => state.activeDomains);
-  const severityThreshold = useStore((state) => state.severityThreshold);
-  const setSeverityThreshold = useStore((state) => state.setSeverityThreshold);
+  const { findings, activeDomains, severityThreshold, setSeverityThreshold } = useStore(
+    useShallow((state) => ({
+      findings: state.findings,
+      activeDomains: state.activeDomains,
+      severityThreshold: state.severityThreshold,
+      setSeverityThreshold: state.setSeverityThreshold,
+    })),
+  );
 
-  const filtered = findings.filter(
-    (finding) => activeDomains.includes(finding.domain) && finding.compound_severity >= severityThreshold
+  const filtered = useMemo(
+    () =>
+      findings.filter(
+        (finding) =>
+          activeDomains.includes(finding.domain) &&
+          finding.compound_severity >= severityThreshold,
+      ),
+    [activeDomains, findings, severityThreshold],
   );
 
   return (
@@ -41,4 +54,3 @@ export function FindingFeed() {
     </div>
   );
 }
-

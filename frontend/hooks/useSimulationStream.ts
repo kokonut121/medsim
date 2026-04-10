@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { WS_BASE } from "@/lib/runtime";
 import { useStore } from "@/store";
 import type { ScenarioAgentTrace, SimulationWsEvent } from "@/types";
 
@@ -21,8 +22,7 @@ export function useSimulationStream(unitId: string) {
     if (!unitId) {
       return;
     }
-    const wsBase = process.env.NEXT_PUBLIC_WS_URL ?? "ws://127.0.0.1:8000";
-    const ws = new WebSocket(`${wsBase}/ws/simulate/${unitId}/live`);
+    const ws = new WebSocket(`${WS_BASE}/ws/simulate/${unitId}/live`);
 
     ws.onmessage = (event) => {
       let payload: SimulationWsEvent;

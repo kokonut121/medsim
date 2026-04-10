@@ -1,5 +1,7 @@
 "use client";
 
+import { useShallow } from "zustand/shallow";
+
 import { DOMAIN_COLORS } from "@/lib/constants";
 import { useStore } from "@/store";
 import type { Domain } from "@/types";
@@ -7,8 +9,12 @@ import type { Domain } from "@/types";
 const domains: Domain[] = ["ICA", "MSA", "FRA", "ERA", "PFA", "SCA"];
 
 export function DomainFilterBar() {
-  const activeDomains = useStore((state) => state.activeDomains);
-  const toggleDomain = useStore((state) => state.toggleDomain);
+  const { activeDomains, toggleDomain } = useStore(
+    useShallow((state) => ({
+      activeDomains: state.activeDomains,
+      toggleDomain: state.toggleDomain,
+    })),
+  );
 
   return (
     <div className="filter-row">
@@ -32,4 +38,3 @@ export function DomainFilterBar() {
     </div>
   );
 }
-

@@ -1,10 +1,12 @@
 "use client";
 
+import { memo } from "react";
+
 import { DOMAIN_COLORS } from "@/lib/constants";
 import { useStore } from "@/store";
 import type { Finding } from "@/types";
 
-export function FindingCard({ finding }: { finding: Finding }) {
+function FindingCardComponent({ finding }: { finding: Finding }) {
   const selectFinding = useStore((state) => state.selectFinding);
   return (
     <button
@@ -24,3 +26,4 @@ export function FindingCard({ finding }: { finding: Finding }) {
   );
 }
 
+export const FindingCard = memo(FindingCardComponent);

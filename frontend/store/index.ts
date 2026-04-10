@@ -35,6 +35,26 @@ type StoreState = {
 
 const allDomains: Domain[] = ["ICA", "MSA", "FRA", "ERA", "PFA", "SCA"];
 
+function upsertBy<T>(
+  items: T[],
+  nextItem: T,
+  isMatch: (item: T) => boolean,
+): T[] {
+  const index = items.findIndex(isMatch);
+
+  if (index === -1) {
+    return [...items, nextItem];
+  }
+
+  if (items[index] === nextItem) {
+    return items;
+  }
+
+  const nextItems = items.slice();
+  nextItems[index] = nextItem;
+  return nextItems;
+}
+
 export const useStore = create<StoreState>((set) => ({
   findings: [],
   activeDomains: allDomains,
@@ -42,7 +62,11 @@ export const useStore = create<StoreState>((set) => ({
   selectedFindingId: null,
   addFinding: (finding) =>
     set((state) => ({
-      findings: [...state.findings.filter((item) => item.finding_id !== finding.finding_id), finding]
+      findings: upsertBy(
+        state.findings,
+        finding,
+        (item) => item.finding_id === finding.finding_id,
+      )
     })),
   setFindings: (findings) => set({ findings }),
   toggleDomain: (domain) =>
@@ -61,12 +85,13 @@ export const useStore = create<StoreState>((set) => ({
   setSimulationStatus: (simulationStatus) => set({ simulationStatus }),
   addSimulationTrace: (trace) =>
     set((state) => ({
-      simulationTraces: [
-        ...state.simulationTraces.filter(
-          (existing) => !(existing.agent_index === trace.agent_index && existing.kind === trace.kind)
-        ),
-        trace
-      ]
+      simulationTraces: upsertBy(
+        state.simulationTraces,
+        trace,
+        (existing) =>
+          existing.agent_index === trace.agent_index &&
+          existing.kind === trace.kind,
+      )
     })),
   appendReasoningChunk: (chunk) =>
     set((state) => ({ reasoningBuffer: state.reasoningBuffer + chunk })),
@@ -79,4 +104,3 @@ export const useStore = create<StoreState>((set) => ({
       currentSimulation: null
     })
 }));
-

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/shallow";
 
 import { AgentActivityRibbon } from "@/components/findings/AgentActivityRibbon";
 import { FindingFeed } from "@/components/findings/FindingFeed";
@@ -12,9 +13,13 @@ import { useStore } from "@/store";
 import type { Scan } from "@/types";
 
 export function ModelClient({ unitId, initialScan }: { unitId: string; initialScan: Scan | null }) {
-  const findings = useStore((state) => state.findings);
-  const setFindings = useStore((state) => state.setFindings);
-  const selectedFindingId = useStore((state) => state.selectedFindingId);
+  const { findings, selectedFindingId, setFindings } = useStore(
+    useShallow((state) => ({
+      findings: state.findings,
+      selectedFindingId: state.selectedFindingId,
+      setFindings: state.setFindings,
+    })),
+  );
   const { signedUrl, status, loading, error } = useSplatModel(unitId);
   const triggeredScan = useRef(false);
   const [scan, setScan] = useState<Scan | null>(initialScan);

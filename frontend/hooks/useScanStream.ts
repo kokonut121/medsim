@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { WS_BASE } from "@/lib/runtime";
 import { useStore } from "@/store";
 
 export function useScanStream(unitId: string) {
@@ -11,8 +12,7 @@ export function useScanStream(unitId: string) {
     if (!unitId) {
       return;
     }
-    const wsBase = process.env.NEXT_PUBLIC_WS_URL ?? "ws://127.0.0.1:8000";
-    const ws = new WebSocket(`${wsBase}/ws/scans/${unitId}/live`);
+    const ws = new WebSocket(`${WS_BASE}/ws/scans/${unitId}/live`);
     ws.onmessage = (event) => {
       addFinding(JSON.parse(event.data));
     };

@@ -1,8 +1,10 @@
 "use client";
 
+import { memo } from "react";
+
 import type { Scan } from "@/types";
 
-export function AgentActivityRibbon({ scan }: { scan: Scan | null }) {
+function AgentActivityRibbonComponent({ scan }: { scan: Scan | null }) {
   const entries = scan ? Object.entries(scan.domain_statuses) : [];
 
   return (
@@ -24,3 +26,4 @@ export function AgentActivityRibbon({ scan }: { scan: Scan | null }) {
   );
 }
 
+export const AgentActivityRibbon = memo(AgentActivityRibbonComponent);

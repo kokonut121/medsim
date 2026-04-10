@@ -1,31 +1,11 @@
 "use client";
 
-/**
- * WorldViewer — primary demo component for the MedSentinel landing page.
- *
- * - Renders the hospital Gaussian-splat world model (.spz) directly in the browser
- *   using @mkkellogg/gaussian-splats-3d (no iframe / no external viewer dependency).
- * - Projects annotation world-positions through the THREE.js camera every frame
- *   so annotation pins genuinely track 3D locations as the user orbits.
- * - Streams live swarm-agent findings over WebSocket and adds them as pins.
- * - Animates agent "avatars" patrolling pre-defined 3D paths through the scene.
- */
-
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
-// ---------------------------------------------------------------------------
-// Fallback splat URL — proxied through our own backend to avoid R2 CORS block
-// ---------------------------------------------------------------------------
-const FALLBACK_SPLAT = `${
-  typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000")
-    : "http://127.0.0.1:8000"
-}/api/models/unit_1/splat/stream`;
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+import { useGaussianSplatViewer } from "@/hooks/useGaussianSplatViewer";
+import { buildApiUrl, WS_BASE } from "@/lib/runtime";
+import { getFallbackSplatUrl, resolveSplatAssetUrl } from "@/lib/splat";
 
 type Severity = "CRITICAL" | "HIGH" | "ADVISORY";
 
@@ -37,7 +17,6 @@ interface AnnotationDef {
   room: string;
   title: string;
   recommendation: string;
-  /** World-space position inside the .spz scene */
   worldPos: [number, number, number];
   cardSide: "left" | "right";
 }
@@ -46,9 +25,8 @@ interface AgentDef {
   id: string;
   role: string;
   color: string;
-  /** Closed loop of world-space waypoints */
   path: Array<[number, number, number]>;
-  speed: number; // units per second
+  speed: number;
 }
 
 interface ScreenPos {
@@ -57,9 +35,15 @@ interface ScreenPos {
   visible: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Static annotation data — real findings from the scan + optimization run
-// ---------------------------------------------------------------------------
+interface AgentPathDef extends AgentDef {
+  segmentLengths: number[];
+  totalLength: number;
+}
+
+const TARGET_OVERLAY_FPS = 30;
+const LIVE_FINDINGS_LIMIT = 5;
+const UNIT_ID = "unit_1";
+
 const ANNOTATIONS: AnnotationDef[] = [
   {
     id: "a1",
@@ -129,9 +113,6 @@ const ANNOTATIONS: AnnotationDef[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Swarm agent patrol paths (world-space loops)
-// ---------------------------------------------------------------------------
 const AGENTS: AgentDef[] = [
   {
     id: "nurse-1",
@@ -170,238 +151,304 @@ const AGENTS: AgentDef[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Colour maps
-// ---------------------------------------------------------------------------
 const SEV_COLOR: Record<Severity, string> = {
   CRITICAL: "#e74c3c",
-  HIGH:     "#e67e22",
+  HIGH: "#e67e22",
   ADVISORY: "#0d7e78",
 };
+
 const SEV_GLOW: Record<Severity, string> = {
   CRITICAL: "rgba(231,76,60,0.5)",
-  HIGH:     "rgba(230,126,34,0.5)",
+  HIGH: "rgba(230,126,34,0.5)",
   ADVISORY: "rgba(13,126,120,0.5)",
 };
+
 const DOMAIN_COLOR: Record<string, string> = {
-  ICA: "#e74c3c", ERA: "#e74c3c",
-  MSA: "#e67e22", FRA: "#e67e22",
-  PFA: "#0d7e78", SCA: "#5b2c8d",
+  ICA: "#e74c3c",
+  ERA: "#e74c3c",
+  MSA: "#e67e22",
+  FRA: "#e67e22",
+  PFA: "#0d7e78",
+  SCA: "#5b2c8d",
 };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const ANNOTATION_COUNTS = ANNOTATIONS.reduce(
+  (counts, annotation) => {
+    counts[annotation.severity] += 1;
+    return counts;
+  },
+  { CRITICAL: 0, HIGH: 0, ADVISORY: 0 } satisfies Record<Severity, number>,
+);
 
-/** Convert Three.js NDC → pixel coordinates within a container */
-function projectToScreen(
-  worldPos: [number, number, number],
-  camera: THREE.PerspectiveCamera,
-  w: number,
-  h: number,
-): ScreenPos {
-  const vec = new THREE.Vector3(...worldPos).project(camera);
+const AGENT_PATHS: AgentPathDef[] = AGENTS.map((agent) => {
+  const segmentLengths: number[] = [];
+  let totalLength = 0;
+
+  for (let index = 0; index < agent.path.length - 1; index += 1) {
+    const current = agent.path[index];
+    const next = agent.path[index + 1];
+    const length = Math.hypot(
+      next[0] - current[0],
+      next[1] - current[1],
+      next[2] - current[2],
+    );
+    segmentLengths.push(length);
+    totalLength += length;
+  }
+
   return {
-    x: ((vec.x + 1) / 2) * w,
-    y: (-(vec.y - 1) / 2) * h,
-    visible: vec.z < 1,
+    ...agent,
+    segmentLengths,
+    totalLength,
+  };
+});
+
+function projectToScreen(
+  vector: THREE.Vector3,
+  camera: THREE.PerspectiveCamera,
+  width: number,
+  height: number,
+): ScreenPos {
+  const projected = vector.project(camera);
+  const x = ((projected.x + 1) / 2) * width;
+  const y = (-(projected.y - 1) / 2) * height;
+
+  return {
+    x,
+    y,
+    visible:
+      projected.z >= -1 &&
+      projected.z <= 1 &&
+      x >= -120 &&
+      x <= width + 120 &&
+      y >= -120 &&
+      y <= height + 120,
   };
 }
 
-/** Interpolate along a closed path given total distance travelled */
-function pathPosition(
-  path: Array<[number, number, number]>,
-  t: number,
-): [number, number, number] {
-  // compute total length
-  const lengths: number[] = [];
-  let total = 0;
-  for (let i = 0; i < path.length - 1; i++) {
-    const d = Math.hypot(
-      path[i + 1][0] - path[i][0],
-      path[i + 1][1] - path[i][1],
-      path[i + 1][2] - path[i][2],
-    );
-    lengths.push(d);
-    total += d;
-  }
-  const dist = ((t % total) + total) % total;
-  let acc = 0;
-  for (let i = 0; i < lengths.length; i++) {
-    if (acc + lengths[i] >= dist) {
-      const frac = (dist - acc) / lengths[i];
-      const a = path[i];
-      const b = path[i + 1];
-      return [
-        a[0] + (b[0] - a[0]) * frac,
-        a[1] + (b[1] - a[1]) * frac,
-        a[2] + (b[2] - a[2]) * frac,
-      ];
+function interpolatePath(
+  agent: AgentPathDef,
+  distance: number,
+  target: THREE.Vector3,
+): THREE.Vector3 {
+  const normalizedDistance =
+    ((distance % agent.totalLength) + agent.totalLength) % agent.totalLength;
+  let traversed = 0;
+
+  for (let index = 0; index < agent.segmentLengths.length; index += 1) {
+    const segmentLength = agent.segmentLengths[index];
+
+    if (traversed + segmentLength >= normalizedDistance) {
+      const start = agent.path[index];
+      const end = agent.path[index + 1];
+      const progress = segmentLength === 0 ? 0 : (normalizedDistance - traversed) / segmentLength;
+
+      return target.set(
+        start[0] + (end[0] - start[0]) * progress,
+        start[1] + (end[1] - start[1]) * progress,
+        start[2] + (end[2] - start[2]) * progress,
+      );
     }
-    acc += lengths[i];
+
+    traversed += segmentLength;
   }
-  return path[0];
+
+  const [x, y, z] = agent.path[0];
+  return target.set(x, y, z);
 }
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
+function updateProjectedElement(
+  element: HTMLElement | null,
+  position: ScreenPos,
+  pointerEvents: "auto" | "none",
+) {
+  if (!element) {
+    return;
+  }
+
+  if (!position.visible) {
+    element.style.opacity = "0";
+    element.style.visibility = "hidden";
+    element.style.pointerEvents = "none";
+    return;
+  }
+
+  element.style.opacity = "1";
+  element.style.visibility = "visible";
+  element.style.pointerEvents = pointerEvents;
+  element.style.transform = `translate3d(${position.x}px, ${position.y}px, 0) translate(-50%, -50%)`;
+}
 
 interface WorldViewerProps {
   initialSplatUrl?: string;
 }
 
 export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
-  /** Outer shell — React owns this, used only for clientWidth/Height measurements */
-  const shellRef  = useRef<HTMLDivElement>(null);
-  /** Inner splat div — the viewer injects its canvas here; React never reconciles children */
-  const splatRef  = useRef<HTMLDivElement>(null);
-  const viewerRef = useRef<import("@mkkellogg/gaussian-splats-3d").Viewer | null>(null);
-  const rafRef       = useRef<number>(0);
-  const startTimeRef = useRef<number>(performance.now());
+  const shellRef = useRef<HTMLDivElement>(null);
+  const splatRef = useRef<HTMLDivElement>(null);
+  const annotationRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const agentRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const shellSizeRef = useRef({ width: 0, height: 0 });
+  const frameRef = useRef<number>(0);
+  const startTimeRef = useRef(0);
 
-  const [splatUrl, setSplatUrl]     = useState<string>(initialSplatUrl ?? "");
+  const [splatUrl, setSplatUrl] = useState(initialSplatUrl ?? "");
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [liveFindings, setLiveFindings] = useState<
+    Array<{ id: string; text: string; sev: Severity }>
+  >([]);
+
   const isIframeUrl = splatUrl.startsWith("https://marble.worldlabs.ai");
-  const [loading, setLoading]       = useState(!splatUrl.startsWith("https://marble.worldlabs.ai"));
-  const [error, setError]           = useState<string | null>(null);
-  const [openId, setOpenId]         = useState<string | null>(null);
+  const { viewerRef, loading: gaussianLoading, error } = useGaussianSplatViewer(
+    isIframeUrl ? "" : splatUrl,
+    splatRef,
+  );
+  const loading = !splatUrl || (!isIframeUrl && gaussianLoading);
 
-  // screen-space positions updated each RAF frame
-  const [annPos,   setAnnPos]   = useState<Record<string, ScreenPos>>({});
-  const [agentPos, setAgentPos] = useState<Record<string, ScreenPos & { role: string; color: string }>>({});
-
-  // live findings arriving over WebSocket
-  const [liveFindings, setLiveFindings] = useState<Array<{ id: string; text: string; sev: Severity }>>([]);
-
-  // ── 1. Resolve splat URL from backend if not injected by server ────────────
   useEffect(() => {
-    if (splatUrl) return;
-    const base = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
-    fetch(`${base}/api/models/unit_1/splat`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => setSplatUrl(d?.stream_url ? `${base}${d.stream_url}` : FALLBACK_SPLAT))
-      .catch(() => setSplatUrl(FALLBACK_SPLAT));
-  }, [splatUrl]);
+    if (splatUrl) {
+      return;
+    }
 
-  // ── 2. Init Gaussian-splat viewer (skipped for iframe URLs) ──────────────
-  useEffect(() => {
-    if (!splatUrl || !splatRef.current || isIframeUrl) return;
-    const splatEl = splatRef.current;
-    let disposed = false;
+    let cancelled = false;
+    const fallback = getFallbackSplatUrl(UNIT_ID);
 
-    const init = async () => {
-      try {
-        setLoading(true);
-        // ⚠ Do NOT call replaceChildren() here — React doesn't own splatEl's
-        // children but calling replaceChildren on cleanup still races with React.
+    fetch(buildApiUrl(`/api/models/${UNIT_ID}/splat`), { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (cancelled) {
+          return;
+        }
 
-        const GS3D = await import("@mkkellogg/gaussian-splats-3d");
-        if (disposed) return;
+        if (!payload) {
+          setSplatUrl(fallback);
+          return;
+        }
 
-        const viewer = new GS3D.Viewer({
-          rootElement:            splatEl,
-          // Standard Y-up; World Labs SPZ models use conventional coordinate system
-          cameraUp:               [0, -1, 0],
-          initialCameraPosition:  [0, 1, 3],
-          initialCameraLookAt:    [0, 0.5, 0],
-          gpuAcceleratedSort:     false,
-          sharedMemoryForWorkers: false,
-          antialiased:            true,
-        });
+        setSplatUrl(
+          resolveSplatAssetUrl(
+            payload as { signed_url: string; stream_url?: string },
+          ),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSplatUrl(fallback);
+        }
+      });
 
-        await viewer.addSplatScene(splatUrl, {
-          // Force .spz for all proxy/stream URLs — they don't end in .spz but they're always .spz
-          format: (splatUrl.endsWith(".spz") || splatUrl.endsWith(".bin") ||
-                   splatUrl.includes("/splat/stream") || splatUrl.includes("/splat/"))
-            ? GS3D.SceneFormat.Spz
-            : undefined,
-          showLoadingUI:              false,
-          splatAlphaRemovalThreshold: 1,
-        });
-
-        if (disposed) { viewer.dispose(); return; }
-
-        viewer.start();
-        viewerRef.current = viewer;
-        setError(null);
-      } catch (err) {
-        if (!disposed)
-          setError(err instanceof Error ? err.message : "Splat load failed");
-      } finally {
-        if (!disposed) setLoading(false);
-      }
-    };
-
-    void init();
     return () => {
-      disposed = true;
-      viewerRef.current?.stop();
-      viewerRef.current?.dispose();
-      viewerRef.current = null;
-      // ⚠ Do NOT call replaceChildren() — the viewer disposes its own canvas;
-      // calling replaceChildren races with React's reconciler and causes
-      // "removeChild: node is not a child" errors.
+      cancelled = true;
     };
   }, [splatUrl]);
 
-  // ── 3. RAF loop — project annotations + agents to screen every frame ──────
   useEffect(() => {
-    const tick = () => {
-      rafRef.current = requestAnimationFrame(tick);
-      const viewer = viewerRef.current;
-      const shell = shellRef.current;
-      if (!viewer?.camera || !shell) return;
+    const shell = shellRef.current;
 
-      const camera = viewer.camera;
-      const w = shell.clientWidth;
-      const h = shell.clientHeight;
+    if (!shell) {
+      return;
+    }
 
-      // Annotations
-      const nextAnn: Record<string, ScreenPos> = {};
-      for (const ann of ANNOTATIONS)
-        nextAnn[ann.id] = projectToScreen(ann.worldPos, camera, w, h);
-      setAnnPos(nextAnn);
-
-      // Swarm agents (time-driven path interpolation)
-      const elapsed = (performance.now() - startTimeRef.current) / 1000;
-      const nextAgent: Record<string, ScreenPos & { role: string; color: string }> = {};
-      for (const ag of AGENTS) {
-        const pos = pathPosition(ag.path, elapsed * ag.speed);
-        const sp  = projectToScreen(pos, camera, w, h);
-        nextAgent[ag.id] = { ...sp, role: ag.role, color: ag.color };
-      }
-      setAgentPos(nextAgent);
+    const updateSize = () => {
+      shellSizeRef.current = {
+        width: shell.clientWidth,
+        height: shell.clientHeight,
+      };
     };
 
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
+    updateSize();
+
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(shell);
+
+    return () => observer.disconnect();
   }, []);
 
-  // ── 4. WebSocket — live findings ──────────────────────────────────────────
   useEffect(() => {
-    const wsBase = process.env.NEXT_PUBLIC_WS_URL ?? "ws://127.0.0.1:8000";
-    const ws = new WebSocket(`${wsBase}/ws/scans/unit_1/live`);
-    ws.onmessage = (ev) => {
-      try {
-        const f = JSON.parse(ev.data as string);
-        setLiveFindings(prev => [
-          { id: f.finding_id, text: f.label_text, sev: f.severity as Severity },
-          ...prev.slice(0, 4),
-        ]);
-      } catch { /* ignore */ }
+    if (isIframeUrl || loading || error) {
+      return;
+    }
+
+    startTimeRef.current = performance.now();
+    const annotationVector = new THREE.Vector3();
+    const agentVector = new THREE.Vector3();
+    let lastPaint = 0;
+
+    const tick = (now: number) => {
+      frameRef.current = requestAnimationFrame(tick);
+
+      if (document.hidden || now - lastPaint < 1000 / TARGET_OVERLAY_FPS) {
+        return;
+      }
+
+      lastPaint = now;
+      const viewer = viewerRef.current;
+      const { width, height } = shellSizeRef.current;
+
+      if (!viewer?.camera || width === 0 || height === 0) {
+        return;
+      }
+
+      for (const annotation of ANNOTATIONS) {
+        annotationVector.set(...annotation.worldPos);
+        updateProjectedElement(
+          annotationRefs.current[annotation.id],
+          projectToScreen(annotationVector, viewer.camera, width, height),
+          "auto",
+        );
+      }
+
+      const elapsedSeconds = (now - startTimeRef.current) / 1000;
+
+      for (const agent of AGENT_PATHS) {
+        const worldPosition = interpolatePath(
+          agent,
+          elapsedSeconds * agent.speed,
+          agentVector,
+        );
+
+        updateProjectedElement(
+          agentRefs.current[agent.id],
+          projectToScreen(worldPosition, viewer.camera, width, height),
+          "none",
+        );
+      }
     };
+
+    frameRef.current = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(frameRef.current);
+  }, [error, isIframeUrl, loading, viewerRef]);
+
+  useEffect(() => {
+    const ws = new WebSocket(`${WS_BASE}/ws/scans/${UNIT_ID}/live`);
+
+    ws.onmessage = (event) => {
+      try {
+        const finding = JSON.parse(event.data as string) as {
+          finding_id: string;
+          label_text: string;
+          severity: Severity;
+        };
+
+        setLiveFindings((current) => [
+          {
+            id: finding.finding_id,
+            text: finding.label_text,
+            sev: finding.severity,
+          },
+          ...current.filter((item) => item.id !== finding.finding_id),
+        ].slice(0, LIVE_FINDINGS_LIMIT));
+      } catch {
+        // Ignore malformed development events.
+      }
+    };
+
     return () => ws.close();
   }, []);
 
-  // ── 5. Stats ──────────────────────────────────────────────────────────────
-  const critCount = ANNOTATIONS.filter(a => a.severity === "CRITICAL").length;
-  const highCount = ANNOTATIONS.filter(a => a.severity === "HIGH").length;
-  const advCount  = ANNOTATIONS.filter(a => a.severity === "ADVISORY").length;
-
   return (
     <div ref={shellRef} className="world-shell">
-
-      {/* WorldLabs iframe viewer — used when a marble.worldlabs.ai URL is provided */}
       {isIframeUrl ? (
         <iframe
           src={splatUrl}
@@ -410,121 +457,127 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
           title="World reconstruction"
         />
       ) : (
-        /* Gaussian-splat viewer injects its canvas here — React never reconciles children */
         <div ref={splatRef} style={{ position: "absolute", inset: 0 }} />
       )}
 
-      {/* Loading / error states */}
-      {loading && (
+      {loading ? (
         <div className="world-loading">
           <div className="world-loading__ring" />
           <p>Loading world model…</p>
         </div>
-      )}
-      {error && !loading && (
+      ) : null}
+
+      {error && !loading ? (
         <div className="world-loading">
           <p style={{ color: SEV_COLOR.CRITICAL }}>⚠ {error}</p>
         </div>
-      )}
+      ) : null}
 
-      {/* Annotation + agent overlay (pointer-events delegated per element) */}
       <div className="world-overlay">
-
-        {/* Annotation pins */}
-        {ANNOTATIONS.map(ann => {
-          const sp = annPos[ann.id];
-          if (!sp?.visible) return null;
-          const color = SEV_COLOR[ann.severity];
-          const glow  = SEV_GLOW[ann.severity];
-          const dc    = DOMAIN_COLOR[ann.domain] ?? color;
-          const isOpen = openId === ann.id;
+        {ANNOTATIONS.map((annotation) => {
+          const color = SEV_COLOR[annotation.severity];
+          const glow = SEV_GLOW[annotation.severity];
+          const domainColor = DOMAIN_COLOR[annotation.domain] ?? color;
+          const isOpen = openId === annotation.id;
 
           return (
             <div
-              key={ann.id}
+              key={annotation.id}
+              ref={(node) => {
+                annotationRefs.current[annotation.id] = node;
+              }}
               className="ann-pin"
-              style={{ left: sp.x, top: sp.y, pointerEvents: "auto" }}
-              onMouseEnter={() => setOpenId(ann.id)}
+              style={{ opacity: 0, visibility: "hidden", pointerEvents: "none" }}
+              onMouseEnter={() => setOpenId(annotation.id)}
               onMouseLeave={() => setOpenId(null)}
-              onClick={() => setOpenId(v => v === ann.id ? null : ann.id)}
+              onClick={() => setOpenId((current) => (current === annotation.id ? null : annotation.id))}
             >
-              {/* pulse rings — staggered */}
-              <span className={`ann-pulse ann-pulse--${ann.severity.toLowerCase()}`}
-                style={{ "--glow": glow } as React.CSSProperties} />
-              <span className={`ann-pulse ann-pulse--${ann.severity.toLowerCase()} ann-pulse--delay`}
-                style={{ "--glow": glow } as React.CSSProperties} />
+              <span
+                className={`ann-pulse ann-pulse--${annotation.severity.toLowerCase()}`}
+                style={{ "--glow": glow } as CSSProperties}
+              />
+              <span
+                className={`ann-pulse ann-pulse--${annotation.severity.toLowerCase()} ann-pulse--delay`}
+                style={{ "--glow": glow } as CSSProperties}
+              />
 
-              {/* dot */}
-              <span className="ann-dot" style={{
-                background: color,
-                boxShadow: `0 0 0 2px rgba(255,255,255,.3), 0 0 12px ${glow}`,
-              }} />
+              <span
+                className="ann-dot"
+                style={{
+                  background: color,
+                  boxShadow: `0 0 0 2px rgba(255,255,255,.3), 0 0 12px ${glow}`,
+                }}
+              />
 
-              {/* domain badge */}
-              <span className="ann-badge" style={{ background: dc }}>{ann.domain}</span>
+              <span className="ann-badge" style={{ background: domainColor }}>
+                {annotation.domain}
+              </span>
 
-              {/* expanded card */}
-              {isOpen && (
-                <div className={`ann-card ann-card--${ann.cardSide}`}
-                  style={{ "--cc": color } as React.CSSProperties}>
+              {isOpen ? (
+                <div
+                  className={`ann-card ann-card--${annotation.cardSide}`}
+                  style={{ "--cc": color } as CSSProperties}
+                >
                   <div className="ann-card__row">
-                    <span className="ann-card__sev" style={{ background: color }}>{ann.severity}</span>
-                    <span className="ann-card__domain">{ann.domainLabel}</span>
-                    <span className="ann-card__room">{ann.room}</span>
+                    <span className="ann-card__sev" style={{ background: color }}>
+                      {annotation.severity}
+                    </span>
+                    <span className="ann-card__domain">{annotation.domainLabel}</span>
+                    <span className="ann-card__room">{annotation.room}</span>
                   </div>
-                  <p className="ann-card__title">{ann.title}</p>
-                  <p className="ann-card__rec">→ {ann.recommendation}</p>
+                  <p className="ann-card__title">{annotation.title}</p>
+                  <p className="ann-card__rec">→ {annotation.recommendation}</p>
                 </div>
-              )}
+              ) : null}
             </div>
           );
         })}
 
-        {/* Swarm agent dots */}
-        {Object.entries(agentPos).map(([id, sp]) => {
-          if (!sp.visible) return null;
-          return (
-            <div
-              key={id}
-              className="agent-dot"
-              title={sp.role}
-              style={{ left: sp.x, top: sp.y, background: sp.color }}
-            />
-          );
-        })}
+        {AGENT_PATHS.map((agent) => (
+          <div
+            key={agent.id}
+            ref={(node) => {
+              agentRefs.current[agent.id] = node;
+            }}
+            className="agent-dot"
+            title={agent.role}
+            style={{ background: agent.color, opacity: 0, visibility: "hidden" }}
+          />
+        ))}
       </div>
 
-      {/* Brand bar */}
       <div className="world-brand">
         <span className="world-brand__logo">MedSentinel</span>
         <span className="world-brand__sub">Northwestern Memorial · Trauma Center · Live scan</span>
       </div>
 
-      {/* Live findings ticker */}
-      {liveFindings.length > 0 && (
+      {liveFindings.length > 0 ? (
         <div className="world-ticker">
-          {liveFindings.map((f, i) => (
-            <div key={f.id} className={`world-tick world-tick--${f.sev.toLowerCase()}`}
-              style={{ opacity: 1 - i * 0.18 }}>
-              <span className="world-tick__sev">{f.sev}</span>
-              {f.text.slice(0, 72)}{f.text.length > 72 ? "…" : ""}
+          {liveFindings.map((finding, index) => (
+            <div
+              key={finding.id}
+              className={`world-tick world-tick--${finding.sev.toLowerCase()}`}
+              style={{ opacity: 1 - index * 0.18 }}
+            >
+              <span className="world-tick__sev">{finding.sev}</span>
+              {finding.text.slice(0, 72)}
+              {finding.text.length > 72 ? "…" : ""}
             </div>
           ))}
         </div>
-      )}
+      ) : null}
 
-      {/* Stats bar */}
       <div className="world-stats">
         <div className="world-stat world-stat--critical">
-          <span className="world-stat__num">{critCount}</span>
+          <span className="world-stat__num">{ANNOTATION_COUNTS.CRITICAL}</span>
           <span className="world-stat__label">Critical</span>
         </div>
         <div className="world-stat world-stat--high">
-          <span className="world-stat__num">{highCount}</span>
+          <span className="world-stat__num">{ANNOTATION_COUNTS.HIGH}</span>
           <span className="world-stat__label">High</span>
         </div>
         <div className="world-stat world-stat--advisory">
-          <span className="world-stat__num">{advCount}</span>
+          <span className="world-stat__num">{ANNOTATION_COUNTS.ADVISORY}</span>
           <span className="world-stat__label">Advisory</span>
         </div>
         <div className="world-stat world-stat--gain">
@@ -532,10 +585,12 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
           <span className="world-stat__label">Efficiency gain</span>
         </div>
         <div className="world-stat">
-          <span className="world-stat__num">{AGENTS.length}</span>
+          <span className="world-stat__num">{AGENT_PATHS.length}</span>
           <span className="world-stat__label">Agents active</span>
         </div>
-        <a href="/dashboard" className="world-cta">Open dashboard →</a>
+        <a href="/dashboard" className="world-cta">
+          Open dashboard →
+        </a>
       </div>
     </div>
   );
