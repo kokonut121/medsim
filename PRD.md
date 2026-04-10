@@ -1,7 +1,7 @@
 # MedSentinel — Product Requirements Document
 
 > AI World Model + Agent Orchestration Network for Hospital Safety & Operations Intelligence  
-> Version 1.1 | Inspired by Orca (HackIllinois 2026)
+> Version 1.1 | Built for Harvard's HSIL Hackathon
 
 ---
 
@@ -30,7 +30,7 @@ MedSentinel constructs a navigable 3D world model of any hospital facility from 
 
 All data is secured through **InterSystems IRIS for Health**, which provides HIPAA-grade encryption (Secure Wallet), FHIR R4 interoperability, role-based access control, and full audit logging as a native healthcare data platform.
 
-The architecture is directly adapted from **Orca** (HackIllinois 2026 Best Voyager Hack winner): the same Google Street View input pipeline, World Labs Gaussian-splat world model, Modal-hosted agent teams, Redis pub/sub consensus aggregation, and React Three Fiber + SparkJS frontend — extended with hospital-domain agent specialization and InterSystems IRIS as the data security backbone.
+MedSentinel is built on top of the World Labs Gaussian-splat world model libraries, combining Google Street View image acquisition, Modal-hosted agent teams, Redis pub/sub consensus aggregation, and a React Three Fiber frontend — with hospital-domain agent specialization and InterSystems IRIS as the data security backbone.
 
 ### Core Value Proposition
 
@@ -80,7 +80,7 @@ Each of the six domains maps to a documented, high-mortality, spatially-detectab
 
 **Why InterSystems IRIS for Health over PostgreSQL:** General-purpose databases require significant bespoke engineering to achieve HIPAA-grade security, healthcare interoperability, and regulatory audit capability. IRIS provides all three natively, including Secure Wallet AES-256 encryption at rest, FHIR R4 repository with REST APIs, full audit logging, and IntegratedML for in-database analytics — satisfying 45 CFR §164.312 without additional engineering.
 
-**Why Google Street View + Places over manual upload:** Orca demonstrated that any building can be world-modeled from publicly available imagery. Requiring hospitals to photograph and upload 200+ interior images creates an infeasible onboarding burden. Street View + Places Photos provides exterior panoramas and user-contributed interior shots for most large hospitals with zero manual effort. Supplemental uploads fill specific gaps only.
+**Why Google Street View + Places over manual upload:** Any building can be world-modeled from publicly available imagery using the World Labs Marble API. Requiring hospitals to photograph and upload 200+ interior images creates an infeasible onboarding burden. Street View + Places Photos provides exterior panoramas and user-contributed interior shots for most large hospitals with zero manual effort. Supplemental uploads fill specific gaps only.
 
 **Why Gaussian splatting (World Labs API):** Photorealistic surface detail preserved at browser-navigable frame rates. A clinician verifying "is that hand sanitizer dispenser actually on the correct side of the door" needs to see the real surface, not a low-poly geometry placeholder.
 
@@ -561,7 +561,7 @@ SEVERITY_SCORES = {"CRITICAL": 1.0, "HIGH": 0.7, "ADVISORY": 0.4}
 |---|---|---|
 | Framework | Next.js | 15 (App Router) |
 | 3D Renderer | React Three Fiber + Drei | r3f v8, Drei v9 |
-| Splat Engine | SparkJS (from Orca) | latest |
+| Splat Engine | `@mkkellogg/gaussian-splats-3d` | 0.4.7 |
 | Maps | Mapbox GL JS | v3 |
 | State | Zustand | v5 |
 | Styling | Tailwind CSS | v4 |
@@ -1064,7 +1064,7 @@ medsent/
 |---|---|---|
 | Public imagery insufficient for interior clinical spaces | HIGH | Street View Indoor + Places Photos covers lobbies, ED entries, main corridors. Coverage map guides users to upload only targeted gap-fill images (5–15 photos), not hundreds. Confidence is discounted for inferred vs. directly-imaged spaces in CSE. |
 | World model fidelity low for unimaged zones | MEDIUM | Scene graph inferred from OSM topology + architectural norm priors for unimaged zones. Agent labels explicitly state evidence basis ("inferred from floor plan" vs. "observed in Street View image"). |
-| Agent findings contain hallucinations | HIGH | Multi-agent consensus (Orca-validated) reduces single-agent error substantially. Confidence threshold (< 0.5) suppresses low-confidence findings from display. Evidence image tile shown per finding. Clinical review recommended before acting on CRITICAL findings. |
+| Agent findings contain hallucinations | HIGH | Multi-agent consensus reduces single-agent error substantially. Confidence threshold (< 0.5) suppresses low-confidence findings from display. Evidence image tile shown per finding. Clinical review recommended before acting on CRITICAL findings. |
 | HIPAA compliance for facility data | CRITICAL | InterSystems IRIS Secure Wallet (AES-256 at rest), RBAC at data layer, Health Connect TLS 1.3 in transit, full audit logging — all IRIS-native. No PHI stored. IRIS security audit in Phase 3. |
 | IRIS deployment complexity | MEDIUM | `intersystems-irispython` SDK well-documented. IRIS runs in Docker; `iris-lockeddown` pre-configures security. `iris/init.sh` automates first-run setup. InterSystems provides 24/7 production support. |
 | Google API cost at scale | LOW | ~$0.21/facility for full exterior acquisition. Images cached in R2 indefinitely (annual refresh). Even 1,000 facilities = ~$210 total acquisition cost. |
