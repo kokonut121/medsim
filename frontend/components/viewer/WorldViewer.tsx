@@ -44,111 +44,21 @@ const TARGET_OVERLAY_FPS = 30;
 const LIVE_FINDINGS_LIMIT = 5;
 const UNIT_ID = "unit_1";
 
-const ANNOTATIONS: AnnotationDef[] = [
-  {
-    id: "a1",
-    severity: "CRITICAL",
-    domain: "ICA",
-    domainLabel: "Infection Control",
-    room: "TC-RESUS",
-    title: "Resuscitation room has no crash cart",
-    recommendation: "Stage a dedicated crash cart inside TC-RESUS.",
-    worldPos: [-1.2, 0.3, 1.0],
-    cardSide: "right",
-  },
-  {
-    id: "a2",
-    severity: "CRITICAL",
-    domain: "ICA",
-    domainLabel: "Infection Control",
-    room: "TC-CORRIDOR",
-    title: "Crash cart in far-end alcove — 45 s extra travel",
-    recommendation: "Relocate to TC-SUPPLY junction for sub-15 s access.",
-    worldPos: [1.5, 0.1, 2.2],
-    cardSide: "left",
-  },
-  {
-    id: "a3",
-    severity: "HIGH",
-    domain: "ERA",
-    domainLabel: "Emergency Response",
-    room: "TB-3",
-    title: "Call light absent from Trauma Bay 3",
-    recommendation: "Install call light connected to TC-NS display.",
-    worldPos: [2.0, 0.5, 0.0],
-    cardSide: "left",
-  },
-  {
-    id: "a4",
-    severity: "HIGH",
-    domain: "ICA",
-    domainLabel: "Infection Control",
-    room: "TB-2",
-    title: "Hand hygiene dispenser inaccessible",
-    recommendation: "Clear obstruction or mount second dispenser at door.",
-    worldPos: [0.8, 0.8, -1.5],
-    cardSide: "left",
-  },
-  {
-    id: "a5",
-    severity: "ADVISORY",
-    domain: "FRA",
-    domainLabel: "Fall Risk",
-    room: "TC-NS",
-    title: "No sightline to trauma bays TB-1 / TB-2",
-    recommendation: "Add glass partition or camera feed.",
-    worldPos: [-0.4, 0.6, -0.8],
-    cardSide: "right",
-  },
-  {
-    id: "a6",
-    severity: "ADVISORY",
-    domain: "PFA",
-    domainLabel: "Patient Flow",
-    room: "TC-CORRIDOR",
-    title: "Clean + dirty traffic merge at corridor centre",
-    recommendation: "Mark dedicated east/west lanes with floor markings.",
-    worldPos: [-1.8, 0.0, 2.5],
-    cardSide: "right",
-  },
-];
+// Grid → world coordinate mapping (must match backend team_utils.py)
+const GRID_SCALE = 0.8;
+const COL_ORIGIN = 2.0;
+const ROW_ORIGIN = 1.5;
 
-const AGENTS: AgentDef[] = [
-  {
-    id: "nurse-1",
-    role: "nurse",
-    color: "#27ae60",
-    path: [[-1, 0, 1], [0, 0, 2], [1, 0, 1], [0, 0, -0.5], [-1, 0, 1]],
-    speed: 0.6,
-  },
-  {
-    id: "nurse-2",
-    role: "nurse",
-    color: "#27ae60",
-    path: [[1, 0, 0], [0.5, 0, -1], [-0.5, 0, -1], [-1, 0, 0], [1, 0, 0]],
-    speed: 0.5,
-  },
-  {
-    id: "doctor-1",
-    role: "doctor",
-    color: "#2980b9",
-    path: [[0, 0, 2.5], [1.5, 0, 1.5], [1.5, 0, 0], [0, 0, -1], [0, 0, 2.5]],
-    speed: 0.7,
-  },
-  {
-    id: "responder-1",
-    role: "emergency_responder",
-    color: "#c0392b",
-    path: [[-2, 0, 2], [-1, 0, 0], [0, 0, 1], [1, 0, 2], [-2, 0, 2]],
-    speed: 1.1,
-  },
-  {
-    id: "supply-1",
-    role: "supply_staff",
-    color: "#8e44ad",
-    path: [[-0.5, 0, 2.5], [-1.5, 0, 1], [-1.5, 0, -0.5], [0, 0, 0], [-0.5, 0, 2.5]],
-    speed: 0.4,
-  },
+function gridToWorld(col: number, row: number): [number, number, number] {
+  return [(col - COL_ORIGIN) * GRID_SCALE, 1.0, (row - ROW_ORIGIN) * GRID_SCALE];
+}
+
+const AGENT_ROLES = [
+  { role: "nurse", color: "#27ae60", speed: 0.55 },
+  { role: "nurse", color: "#27ae60", speed: 0.48 },
+  { role: "instructor", color: "#2980b9", speed: 0.65 },
+  { role: "emergency_responder", color: "#c0392b", speed: 1.05 },
+  { role: "supply_staff", color: "#8e44ad", speed: 0.38 },
 ];
 
 const SEV_COLOR: Record<Severity, string> = {
@@ -172,36 +82,78 @@ const DOMAIN_COLOR: Record<string, string> = {
   SCA: "#5b2c8d",
 };
 
-const ANNOTATION_COUNTS = ANNOTATIONS.reduce(
-  (counts, annotation) => {
-    counts[annotation.severity] += 1;
-    return counts;
-  },
-  { CRITICAL: 0, HIGH: 0, ADVISORY: 0 } satisfies Record<Severity, number>,
-);
+const DOMAIN_LABEL: Record<string, string> = {
+  ICA: "Infection Control",
+  ERA: "Emergency Response",
+  MSA: "Medication Safety",
+  FRA: "Fall Risk",
+  PFA: "Patient Flow",
+  SCA: "Safe Communication",
+};
 
-const AGENT_PATHS: AgentPathDef[] = AGENTS.map((agent) => {
-  const segmentLengths: number[] = [];
-  let totalLength = 0;
+function buildAgentPaths(rooms: Array<Record<string, unknown>>): AgentPathDef[] {
+  const corridors = rooms.filter((r) => r.type === "corridor" || r.type === "hallway");
+  const patientRooms = rooms.filter((r) =>
+    ["patient_room", "icu_bay", "simulation_room", "skills_lab"].includes(r.type as string),
+  );
 
-  for (let index = 0; index < agent.path.length - 1; index += 1) {
-    const current = agent.path[index];
-    const next = agent.path[index + 1];
-    const length = Math.hypot(
-      next[0] - current[0],
-      next[1] - current[1],
-      next[2] - current[2],
-    );
-    segmentLengths.push(length);
-    totalLength += length;
+  const corridorWaypoints: Array<[number, number, number]> = corridors
+    .sort((a, b) => {
+      const aCol = (a.grid_col as number) ?? 0;
+      const bCol = (b.grid_col as number) ?? 0;
+      return aCol - bCol;
+    })
+    .map((r) => gridToWorld((r.grid_col as number) ?? 0, (r.grid_row as number) ?? 0));
+
+  if (corridorWaypoints.length < 2) {
+    // Fallback: scatter around origin
+    corridorWaypoints.push([-1, 1, -1], [1, 1, -1], [1, 1, 1], [-1, 1, 1]);
   }
+  const loopPath: Array<[number, number, number]> = [...corridorWaypoints, corridorWaypoints[0]];
 
-  return {
-    ...agent,
-    segmentLengths,
-    totalLength,
-  };
-});
+  return AGENT_ROLES.map((roleInfo, i) => {
+    let path: Array<[number, number, number]>;
+    if (i < 2) {
+      // Nurses: follow corridor loop
+      path = loopPath;
+    } else if (i === 2 && patientRooms.length > 0) {
+      // Instructor: visits patient/sim rooms
+      const roomWaypoints = patientRooms.slice(0, 4).map((r) =>
+        gridToWorld((r.grid_col as number) ?? 0, (r.grid_row as number) ?? 0),
+      );
+      path = [...roomWaypoints, roomWaypoints[0]];
+    } else if (i === 3) {
+      // Emergency responder: fast patrol of corridor
+      path = loopPath;
+    } else {
+      // Supply: a subset of corridor
+      const halfLen = Math.max(2, Math.floor(corridorWaypoints.length / 2));
+      path = [...corridorWaypoints.slice(0, halfLen), ...corridorWaypoints.slice(0, halfLen).reverse()];
+    }
+
+    const segmentLengths: number[] = [];
+    let totalLength = 0;
+    for (let j = 0; j < path.length - 1; j++) {
+      const len = Math.hypot(
+        path[j + 1][0] - path[j][0],
+        path[j + 1][1] - path[j][1],
+        path[j + 1][2] - path[j][2],
+      );
+      segmentLengths.push(len);
+      totalLength += len;
+    }
+
+    return {
+      id: `${roleInfo.role}-${i + 1}`,
+      role: roleInfo.role,
+      color: roleInfo.color,
+      speed: roleInfo.speed,
+      path,
+      segmentLengths,
+      totalLength: totalLength || 1,
+    };
+  });
+}
 
 function projectToScreen(
   vector: THREE.Vector3,
@@ -297,6 +249,8 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
   const [liveFindings, setLiveFindings] = useState<
     Array<{ id: string; text: string; sev: Severity }>
   >([]);
+  const [annotations, setAnnotations] = useState<AnnotationDef[]>([]);
+  const [agentPaths, setAgentPaths] = useState<AgentPathDef[]>([]);
 
   const isIframeUrl = splatUrl.startsWith("https://marble.worldlabs.ai");
   const { viewerRef, loading: gaussianLoading, error } = useGaussianSplatViewer(
@@ -305,69 +259,96 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
   );
   const loading = !splatUrl || (!isIframeUrl && gaussianLoading);
 
+  // Load splat URL
   useEffect(() => {
-    if (splatUrl) {
-      return;
-    }
-
+    if (splatUrl) return;
     let cancelled = false;
     const fallback = getFallbackSplatUrl(UNIT_ID);
 
     fetch(buildApiUrl(`/api/models/${UNIT_ID}/splat`), { cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : null))
+      .then((r) => (r.ok ? r.json() : null))
       .then((payload) => {
-        if (cancelled) {
-          return;
-        }
-
-        if (!payload) {
-          setSplatUrl(fallback);
-          return;
-        }
-
-        setSplatUrl(
-          resolveSplatAssetUrl(
-            payload as { signed_url: string; stream_url?: string },
-          ),
-        );
+        if (cancelled) return;
+        setSplatUrl(payload ? resolveSplatAssetUrl(payload as { signed_url: string; stream_url?: string }) : fallback);
       })
-      .catch(() => {
-        if (!cancelled) {
-          setSplatUrl(fallback);
-        }
-      });
+      .catch(() => { if (!cancelled) setSplatUrl(fallback); });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [splatUrl]);
 
+  // Load findings from API → annotations; trigger scan if empty
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = () =>
+      fetch(buildApiUrl(`/api/scans/${UNIT_ID}/findings`), { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : []))
+        .then((findings: Array<Record<string, unknown>>) => {
+          if (cancelled) return;
+          if (!findings.length) {
+            // Trigger a scan and retry after a delay
+            fetch(buildApiUrl(`/api/scans/${UNIT_ID}/trigger`), { method: "POST" }).catch(() => null);
+            setTimeout(load, 4000);
+            return;
+          }
+          const defs: AnnotationDef[] = findings.map((f, i) => {
+            const anchor = f.spatial_anchor as { x?: number; y?: number; z?: number } | undefined;
+            const severity = (f.severity as string) === "HIGH" ? "HIGH"
+              : (f.severity as string) === "CRITICAL" ? "CRITICAL"
+              : "ADVISORY";
+            const domain = (f.domain as string) ?? "ICA";
+            return {
+              id: (f.finding_id as string) ?? `f-${i}`,
+              severity: severity as Severity,
+              domain,
+              domainLabel: DOMAIN_LABEL[domain] ?? domain,
+              room: (f.room_id as string) ?? "",
+              title: (f.label_text as string) ?? "",
+              recommendation: (f.recommendation as string) ?? "",
+              worldPos: [anchor?.x ?? 0, anchor?.y ?? 1.0, anchor?.z ?? 0],
+              cardSide: i % 2 === 0 ? "right" : "left",
+            };
+          });
+          setAnnotations(defs);
+        })
+        .catch(() => null);
+
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Load scene graph → build agent patrol paths
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch(buildApiUrl(`/api/models/${UNIT_ID}/scene_graph`), { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((sg: Record<string, unknown> | null) => {
+        if (cancelled || !sg) return;
+        const rooms = (sg.rooms as Array<Record<string, unknown>>) ?? [];
+        setAgentPaths(buildAgentPaths(rooms));
+      })
+      .catch(() => null);
+
+    return () => { cancelled = true; };
+  }, []);
+
+  // Shell resize observer
   useEffect(() => {
     const shell = shellRef.current;
-
-    if (!shell) {
-      return;
-    }
-
+    if (!shell) return;
     const updateSize = () => {
-      shellSizeRef.current = {
-        width: shell.clientWidth,
-        height: shell.clientHeight,
-      };
+      shellSizeRef.current = { width: shell.clientWidth, height: shell.clientHeight };
     };
-
     updateSize();
-
     const observer = new ResizeObserver(updateSize);
     observer.observe(shell);
-
     return () => observer.disconnect();
   }, []);
 
+  // RAF loop
   useEffect(() => {
-    if (isIframeUrl || loading || error) {
-      return;
-    }
+    if (isIframeUrl || loading || error) return;
 
     startTimeRef.current = performance.now();
     const annotationVector = new THREE.Vector3();
@@ -377,19 +358,14 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
     const tick = (now: number) => {
       frameRef.current = requestAnimationFrame(tick);
 
-      if (document.hidden || now - lastPaint < 1000 / TARGET_OVERLAY_FPS) {
-        return;
-      }
-
+      if (document.hidden || now - lastPaint < 1000 / TARGET_OVERLAY_FPS) return;
       lastPaint = now;
+
       const viewer = viewerRef.current;
       const { width, height } = shellSizeRef.current;
+      if (!viewer?.camera || width === 0 || height === 0) return;
 
-      if (!viewer?.camera || width === 0 || height === 0) {
-        return;
-      }
-
-      for (const annotation of ANNOTATIONS) {
+      for (const annotation of annotations) {
         annotationVector.set(...annotation.worldPos);
         updateProjectedElement(
           annotationRefs.current[annotation.id],
@@ -400,13 +376,8 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
 
       const elapsedSeconds = (now - startTimeRef.current) / 1000;
 
-      for (const agent of AGENT_PATHS) {
-        const worldPosition = interpolatePath(
-          agent,
-          elapsedSeconds * agent.speed,
-          agentVector,
-        );
-
+      for (const agent of agentPaths) {
+        const worldPosition = interpolatePath(agent, elapsedSeconds * agent.speed, agentVector);
         updateProjectedElement(
           agentRefs.current[agent.id],
           projectToScreen(worldPosition, viewer.camera, width, height),
@@ -416,10 +387,10 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
     };
 
     frameRef.current = requestAnimationFrame(tick);
-
     return () => cancelAnimationFrame(frameRef.current);
-  }, [error, isIframeUrl, loading, viewerRef]);
+  }, [agentPaths, annotations, error, isIframeUrl, loading, viewerRef]);
 
+  // WebSocket live feed
   useEffect(() => {
     const ws = new WebSocket(`${WS_BASE}/ws/scans/${UNIT_ID}/live`);
 
@@ -432,11 +403,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
         };
 
         setLiveFindings((current) => [
-          {
-            id: finding.finding_id,
-            text: finding.label_text,
-            sev: finding.severity,
-          },
+          { id: finding.finding_id, text: finding.label_text, sev: finding.severity },
           ...current.filter((item) => item.id !== finding.finding_id),
         ].slice(0, LIVE_FINDINGS_LIMIT));
       } catch {
@@ -446,6 +413,11 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
 
     return () => ws.close();
   }, []);
+
+  const annotationCounts = annotations.reduce(
+    (counts, a) => { counts[a.severity] += 1; return counts; },
+    { CRITICAL: 0, HIGH: 0, ADVISORY: 0 } as Record<Severity, number>,
+  );
 
   return (
     <div ref={shellRef} className="world-shell">
@@ -474,7 +446,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
       ) : null}
 
       <div className="world-overlay">
-        {ANNOTATIONS.map((annotation) => {
+        {annotations.map((annotation) => {
           const color = SEV_COLOR[annotation.severity];
           const glow = SEV_GLOW[annotation.severity];
           const domainColor = DOMAIN_COLOR[annotation.domain] ?? color;
@@ -483,9 +455,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
           return (
             <div
               key={annotation.id}
-              ref={(node) => {
-                annotationRefs.current[annotation.id] = node;
-              }}
+              ref={(node) => { annotationRefs.current[annotation.id] = node; }}
               className="ann-pin"
               style={{ opacity: 0, visibility: "hidden", pointerEvents: "none" }}
               onMouseEnter={() => setOpenId(annotation.id)}
@@ -533,12 +503,10 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
           );
         })}
 
-        {AGENT_PATHS.map((agent) => (
+        {agentPaths.map((agent) => (
           <div
             key={agent.id}
-            ref={(node) => {
-              agentRefs.current[agent.id] = node;
-            }}
+            ref={(node) => { agentRefs.current[agent.id] = node; }}
             className="agent-dot"
             title={agent.role}
             style={{ background: agent.color, opacity: 0, visibility: "hidden" }}
@@ -548,7 +516,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
 
       <div className="world-brand">
         <span className="world-brand__logo">MedSentinel</span>
-        <span className="world-brand__sub">Northwestern Memorial · Trauma Center · Live scan</span>
+        <span className="world-brand__sub">LeTourneau University · Nursing Skills Lab · Live scan</span>
       </div>
 
       {liveFindings.length > 0 ? (
@@ -569,15 +537,15 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
 
       <div className="world-stats">
         <div className="world-stat world-stat--critical">
-          <span className="world-stat__num">{ANNOTATION_COUNTS.CRITICAL}</span>
+          <span className="world-stat__num">{annotationCounts.CRITICAL}</span>
           <span className="world-stat__label">Critical</span>
         </div>
         <div className="world-stat world-stat--high">
-          <span className="world-stat__num">{ANNOTATION_COUNTS.HIGH}</span>
+          <span className="world-stat__num">{annotationCounts.HIGH}</span>
           <span className="world-stat__label">High</span>
         </div>
         <div className="world-stat world-stat--advisory">
-          <span className="world-stat__num">{ANNOTATION_COUNTS.ADVISORY}</span>
+          <span className="world-stat__num">{annotationCounts.ADVISORY}</span>
           <span className="world-stat__label">Advisory</span>
         </div>
         <div className="world-stat world-stat--gain">
@@ -585,7 +553,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
           <span className="world-stat__label">Efficiency gain</span>
         </div>
         <div className="world-stat">
-          <span className="world-stat__num">{AGENT_PATHS.length}</span>
+          <span className="world-stat__num">{agentPaths.length}</span>
           <span className="world-stat__label">Agents active</span>
         </div>
         <a href="/dashboard" className="world-cta">
