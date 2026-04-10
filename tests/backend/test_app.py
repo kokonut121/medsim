@@ -55,3 +55,20 @@ def test_model_status_endpoint_for_seeded_model():
     payload = response.json()
     assert payload["status"] == "ready"
     assert payload["unit_id"] == "unit_1"
+
+
+def test_fhir_routes_return_synthetic_projection_for_completed_scan():
+    scan_response = client.post("/api/scans/unit_1/run")
+    assert scan_response.status_code == 200
+    scan = scan_response.json()
+
+    report_response = client.get(f"/api/fhir/DiagnosticReport/{scan['scan_id']}")
+    assert report_response.status_code == 200
+    report = report_response.json()
+    assert report["resourceType"] == "DiagnosticReport"
+    assert report["id"] == scan["scan_id"]
+
+    observation_response = client.get(f"/api/fhir/Observation/{scan['findings'][0]['finding_id']}")
+    assert observation_response.status_code == 200
+    observation = observation_response.json()
+    assert observation["resourceType"] == "Observation"

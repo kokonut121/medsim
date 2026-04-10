@@ -1,16 +1,22 @@
-version: "3.9"
-
 services:
   iris:
-    image: containers.intersystems.com/intersystems/irishealth:2026.1-em-lockeddown
+    image: ${IRIS_IMAGE:-intersystems/irishealth-community:latest-cd}
     environment:
-      ISC_DATA_DIRECTORY: /dur/irisdata
-      ISC_CPF_FILE_NAME: /dur/iris.cpf
+      ISC_DATA_DIRECTORY: /home/irisowner/irisdata
+      ISC_CPF_FILE_NAME: /home/irisowner/iris.cpf
+      MEDSENT_NAMESPACE: ${IRIS_NAMESPACE:-MEDSENT}
+      MEDSENT_APP_USER: ${IRIS_USER:-medsent_app}
+      MEDSENT_APP_PASSWORD: ${IRIS_PASSWORD:-changeme}
+      MEDSENT_FHIR_PATH: ${MEDSENT_FHIR_PATH:-/fhir/r4}
+      MEDSENT_FHIR_METADATA_PACKAGE: ${MEDSENT_FHIR_METADATA_PACKAGE:-hl7.fhir.r4.core@4.0.1}
+      MEDSENT_FHIR_STRATEGY_CLASS: ${MEDSENT_FHIR_STRATEGY_CLASS:-HS.FHIRServer.Storage.Json.InteractionsStrategy}
+      MEDSENT_SERVER_NAME: ${MEDSENT_SERVER_NAME:-MedSentinelFHIR}
+      MEDSENT_WALLET_COLLECTION: ${MEDSENT_WALLET_COLLECTION:-MedSentinel}
     volumes:
-      - iris-data:/dur/irisdata
-      - ./iris/iris.cpf:/dur/iris.cpf:ro
+      - ./iris/iris.cpf:/home/irisowner/iris.cpf:ro
       - ./iris/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
-      - ./iris/fhir_config.json:/dur/fhir_config.json:ro
+      - ./iris/MedSentinelInstaller.cls:/docker-entrypoint-initdb.d/MedSentinelInstaller.cls:ro
+      - ./iris/fhir_config.json:/docker-entrypoint-initdb.d/fhir_config.json:ro
     ports:
       - "1972:1972"
       - "52773:52773"
@@ -40,10 +46,6 @@ services:
     networks:
       - internal
 
-volumes:
-  iris-data:
-
 networks:
   internal:
     driver: bridge
-

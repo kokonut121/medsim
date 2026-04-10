@@ -103,6 +103,7 @@ The system has four clearly separated concerns:
 
 ## Repository Layout
 
+<<<<<<< HEAD
 ```
 trauma-reconstruction/
 ├── backend/
@@ -140,9 +141,16 @@ trauma-reconstruction/
 ├── pytest.ini
 └── .env.example
 ```
+=======
+- `backend/`: FastAPI APIs, pipeline steps, agent orchestration, and report generation.
+- `frontend/`: Next.js 15 App Router UI for dashboard, coverage, world model viewer, and reports.
+- `iris/`: Locked-down IRIS configuration, bootstrap, and FHIR setup for local and shared-dev environments.
+- `docs/`: Agent-first repository knowledge base and execution-plan structure.
+>>>>>>> d4eefc8 (Attemping IRIS fixes)
 
 ---
 
+<<<<<<< HEAD
 ## Prerequisites
 
 - **Python 3.11+**
@@ -397,3 +405,11 @@ redis_client.publish()  →  WebSocket → browser live findings panel
     ↓
 /api/reports  →  PDF (ReportLab) or FHIR DiagnosticReport (IRIS FHIR R4)
 ```
+=======
+1. Create a virtual environment and install `backend/requirements.txt`.
+2. Copy `.env.example` to `.env` and fill in Google, World Labs, Cloudflare R2, and Mapbox credentials.
+3. Start and bootstrap IRIS with `./scripts/bootstrap-iris.sh`. Local development defaults to the public `intersystems/irishealth-community:latest-cd` image and writes IRIS data into `/home/irisowner/irisdata` inside the container so startup works without privileged volume setup; production can override `IRIS_IMAGE` back to the locked-down registry image and attach a properly permissioned durable data mount.
+4. Install dependencies in `frontend/` and run `npm run build`.
+5. Start the backend with `./scripts/start-backend.sh`.
+6. Start the frontend with `npm run dev` inside `frontend/`.
+>>>>>>> d4eefc8 (Attemping IRIS fixes)

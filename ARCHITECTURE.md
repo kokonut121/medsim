@@ -33,6 +33,6 @@ MedSentinel is organized into four legible layers:
 ## Development Notes
 
 - Current persistence is in-memory for local determinism, but public interfaces mirror the PRD’s IRIS-backed behavior.
+- Setting `MEDSENTINEL_IRIS_MODE=native` switches the persistence seam to the InterSystems Native SDK and the configured FHIR repository.
 - Current world-model rendering is a viewer shell with annotation overlays and signed-URL plumbing. SparkJS wiring can replace the placeholder surface without route changes.
 - Current agent outputs are deterministic synthetic findings shaped to the PRD schema so downstream viewer and report flows are testable now.
-

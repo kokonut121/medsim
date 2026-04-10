@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,6 +10,7 @@ class Settings(BaseSettings):
 
     app_name: str = "MedSentinel"
     app_env: str = Field(default="development", alias="MEDSENTINEL_ENV")
+    iris_mode: Literal["memory", "native"] = Field(default="memory", alias="MEDSENTINEL_IRIS_MODE")
 
     iris_host: str = "localhost"
     iris_port: int = 1972
@@ -16,6 +18,8 @@ class Settings(BaseSettings):
     iris_user: str = "medsent_app"
     iris_password: str = "changeme"
     iris_fhir_base: str = "http://localhost:52773/fhir/r4"
+    iris_connect_timeout_ms: int = 10000
+    iris_sharedmemory: bool = False
     iris_health_connect_endpoint: str = ""
 
     google_api_key: str = ""
