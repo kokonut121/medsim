@@ -2,6 +2,9 @@ import { WorldViewer } from "@/components/viewer/WorldViewer";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
+// Pre-built world reconstruction — swap back to getSplatUrl() once new scans are ready
+const WORLD_RECONSTRUCTION_URL = "https://marble.worldlabs.ai/world/65bab75f-b181-4314-be3a-3b3cb88c3deb";
+
 async function getSplatUrl(): Promise<string> {
   const fallback = `${API}/api/models/unit_1/splat/stream`;
   try {
@@ -16,10 +19,11 @@ async function getSplatUrl(): Promise<string> {
 }
 
 export default async function LandingPage() {
-  const splatUrl = await getSplatUrl();
+  // Use pre-built reconstruction; fall back to API-generated splat when ready
+  // const splatUrl = await getSplatUrl();
   return (
     <main className="demo-root">
-      <WorldViewer initialSplatUrl={splatUrl} />
+      <WorldViewer initialSplatUrl={WORLD_RECONSTRUCTION_URL} />
     </main>
   );
 }

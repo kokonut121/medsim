@@ -35,6 +35,9 @@ export default async function FacilityDetailPage({ params }: { params: Promise<{
                 <Link className="button" href={`/facility/${id}/model/${unit.unit_id}` as Route}>
                   Open model
                 </Link>
+                <Link className="button secondary" href={`/facility/${id}/simulation/${unit.unit_id}` as Route}>
+                  Simulate crisis
+                </Link>
                 <Link className="button secondary" href={`/facility/${id}/report/${unit.unit_id}` as Route}>
                   Report
                 </Link>

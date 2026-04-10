@@ -261,7 +261,8 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
   const startTimeRef = useRef<number>(performance.now());
 
   const [splatUrl, setSplatUrl]     = useState<string>(initialSplatUrl ?? "");
-  const [loading, setLoading]       = useState(true);
+  const isIframeUrl = splatUrl.startsWith("https://marble.worldlabs.ai");
+  const [loading, setLoading]       = useState(!splatUrl.startsWith("https://marble.worldlabs.ai"));
   const [error, setError]           = useState<string | null>(null);
   const [openId, setOpenId]         = useState<string | null>(null);
 
@@ -282,9 +283,9 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
       .catch(() => setSplatUrl(FALLBACK_SPLAT));
   }, [splatUrl]);
 
-  // ── 2. Init Gaussian-splat viewer ─────────────────────────────────────────
+  // ── 2. Init Gaussian-splat viewer (skipped for iframe URLs) ──────────────
   useEffect(() => {
-    if (!splatUrl || !splatRef.current) return;
+    if (!splatUrl || !splatRef.current || isIframeUrl) return;
     const splatEl = splatRef.current;
     let disposed = false;
 
@@ -399,8 +400,18 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
   return (
     <div ref={shellRef} className="world-shell">
 
-      {/* Viewer injects its canvas into this div — React never reconciles its children */}
-      <div ref={splatRef} style={{ position: "absolute", inset: 0 }} />
+      {/* WorldLabs iframe viewer — used when a marble.worldlabs.ai URL is provided */}
+      {isIframeUrl ? (
+        <iframe
+          src={splatUrl}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+          allow="xr-spatial-tracking; accelerometer; gyroscope"
+          title="World reconstruction"
+        />
+      ) : (
+        /* Gaussian-splat viewer injects its canvas here — React never reconciles children */
+        <div ref={splatRef} style={{ position: "absolute", inset: 0 }} />
+      )}
 
       {/* Loading / error states */}
       {loading && (
