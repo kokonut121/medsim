@@ -271,7 +271,8 @@ def _render(
         if show_sightlines and rect.sightline:
             ax.text(
                 rect.x + rect.w - 0.12, rect.y + rect.h - 0.15,
-                "👁", fontsize=7, ha="right", va="top", zorder=5,
+                "[NS]", fontsize=5.5, ha="right", va="top", zorder=5,
+                color="#27ae60", fontweight="bold",
             )
 
     # Draw equipment (movable layer)

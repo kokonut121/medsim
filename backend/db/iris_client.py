@@ -70,29 +70,121 @@ class IRISClient:
                     "unit_type": "ED",
                     "rooms": [
                         {
+                            "room_id": "ED-ENTRY",
+                            "type": "ed_entrance_ambulance_bay",
+                            "area_sqft_estimate": 600,
+                            "equipment": [
+                                {"type": "hand_hygiene_dispenser", "position": "entry door left", "accessible": True, "confidence": 0.95},
+                            ],
+                            "adjacency": ["ED-TRIAGE", "ED-CORRIDOR"],
+                            "sightline_to_nursing_station": False,
+                            "image_source_quality": "street_view",
+                        },
+                        {
+                            "room_id": "ED-TRIAGE",
+                            "type": "nursing_station",
+                            "area_sqft_estimate": 280,
+                            "equipment": [
+                                {"type": "workstation", "position": "center desk", "accessible": True, "confidence": 0.93},
+                                {"type": "hand_hygiene_dispenser", "position": "desk right", "accessible": True, "confidence": 0.91},
+                            ],
+                            "adjacency": ["ED-ENTRY", "ED-CORRIDOR", "ED-101", "ED-102"],
+                            "sightline_to_nursing_station": True,
+                            "image_source_quality": "places",
+                        },
+                        {
+                            "room_id": "ED-CORRIDOR",
+                            "type": "corridor_hallway",
+                            "area_sqft_estimate": 800,
+                            "equipment": [
+                                {"type": "crash_cart", "position": "north alcove — far from bays", "accessible": True, "confidence": 0.92},
+                            ],
+                            "adjacency": ["ED-ENTRY", "ED-TRIAGE", "ED-101", "ED-102", "ED-103", "ED-104", "ED-MED"],
+                            "sightline_to_nursing_station": True,
+                            "image_source_quality": "places",
+                        },
+                        {
                             "room_id": "ED-101",
+                            "type": "patient_room",
+                            "area_sqft_estimate": 200,
+                            "equipment": [
+                                {"type": "monitor", "position": "wall mount above bed", "accessible": True, "confidence": 0.89},
+                                {"type": "iv_pole", "position": "bedside right", "accessible": True, "confidence": 0.87},
+                                {"type": "call_light", "position": "bed rail", "accessible": True, "confidence": 0.95},
+                            ],
+                            "adjacency": ["ED-CORRIDOR", "ED-TRIAGE"],
+                            "sightline_to_nursing_station": True,
+                            "image_source_quality": "places",
+                        },
+                        {
+                            "room_id": "ED-102",
+                            "type": "patient_room",
+                            "area_sqft_estimate": 200,
+                            "equipment": [
+                                {"type": "monitor", "position": "wall mount above bed", "accessible": True, "confidence": 0.88},
+                                {"type": "iv_pole", "position": "bedside left", "accessible": True, "confidence": 0.86},
+                                {"type": "call_light", "position": "bed rail", "accessible": True, "confidence": 0.94},
+                            ],
+                            "adjacency": ["ED-CORRIDOR", "ED-TRIAGE"],
+                            "sightline_to_nursing_station": True,
+                            "image_source_quality": "places",
+                        },
+                        {
+                            "room_id": "ED-103",
                             "type": "patient_room",
                             "area_sqft_estimate": 180,
                             "equipment": [
-                                {
-                                    "type": "crash_cart",
-                                    "position": "north corridor alcove",
-                                    "accessible": True,
-                                    "confidence": 0.92,
-                                }
+                                {"type": "monitor", "position": "wall mount", "accessible": True, "confidence": 0.85},
+                                {"type": "call_light", "position": "bed rail", "accessible": True, "confidence": 0.93},
                             ],
-                            "adjacency": ["ED-CORE"],
+                            "adjacency": ["ED-CORRIDOR"],
                             "sightline_to_nursing_station": False,
                             "image_source_quality": "places",
-                        }
+                        },
+                        {
+                            "room_id": "ED-104",
+                            "type": "icu_bay",
+                            "area_sqft_estimate": 320,
+                            "equipment": [
+                                {"type": "ventilator", "position": "head of bed", "accessible": True, "confidence": 0.91},
+                                {"type": "monitor", "position": "ceiling arm", "accessible": True, "confidence": 0.94},
+                                {"type": "hand_hygiene_dispenser", "position": "room entry — missing", "accessible": False, "confidence": 0.78},
+                            ],
+                            "adjacency": ["ED-CORRIDOR"],
+                            "sightline_to_nursing_station": False,
+                            "image_source_quality": "places",
+                        },
+                        {
+                            "room_id": "ED-MED",
+                            "type": "medication_room_pharmacy",
+                            "area_sqft_estimate": 160,
+                            "equipment": [
+                                {"type": "adc", "position": "back wall", "accessible": True, "confidence": 0.96},
+                                {"type": "workstation", "position": "counter left", "accessible": True, "confidence": 0.90},
+                            ],
+                            "adjacency": ["ED-CORRIDOR"],
+                            "sightline_to_nursing_station": False,
+                            "image_source_quality": "places",
+                        },
+                        {
+                            "room_id": "ED-UTILITY",
+                            "type": "utility_support",
+                            "area_sqft_estimate": 120,
+                            "equipment": [
+                                {"type": "hand_hygiene_dispenser", "position": "door entry", "accessible": True, "confidence": 0.88},
+                            ],
+                            "adjacency": ["ED-CORRIDOR"],
+                            "sightline_to_nursing_station": False,
+                            "image_source_quality": "street_view",
+                        },
                     ],
                 }
             ],
             "flow_annotations": {
-                "patient_flow_paths": [["ED-ENTRY", "ED-CORE", "ED-101"]],
-                "staff_flow_paths": [["ED-DESK", "ED-CORE", "ED-101"]],
-                "clean_corridors": ["ED-C1"],
-                "dirty_corridors": ["ED-C2"],
+                "patient_flow_paths": [["ED-ENTRY", "ED-TRIAGE", "ED-CORRIDOR", "ED-101"]],
+                "staff_flow_paths": [["ED-TRIAGE", "ED-CORRIDOR", "ED-MED", "ED-104"]],
+                "clean_corridors": ["ED-CORRIDOR"],
+                "dirty_corridors": ["ED-UTILITY"],
             },
         }
         self.models["model_unit_1"] = WorldModel(
