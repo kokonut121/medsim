@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.api.facilities import router as facilities_router
 from backend.api.fhir import router as fhir_router
 from backend.api.models import router as models_router
+from backend.api.optimize import router as optimize_router
 from backend.api.reports import router as reports_router
 from backend.api.scans import router as scans_router
 from backend.api.upload import router as upload_router
@@ -24,6 +25,7 @@ app.add_middleware(
 
 app.include_router(facilities_router)
 app.include_router(models_router)
+app.include_router(optimize_router)
 app.include_router(scans_router)
 app.include_router(upload_router)
 app.include_router(fhir_router)

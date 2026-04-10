@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import os
 
+import fal_client
 import httpx
 
 from backend.config import get_settings
@@ -70,51 +72,26 @@ def _prompt_for(category: str) -> str:
 # ---------------------------------------------------------------------------
 
 async def _run_flux(prompt: str, fal_key: str, *, image_size: str = "landscape_4_3") -> bytes:
-    """
-    Submit a Flux Schnell request to fal.ai and return the image bytes.
-    Uses the REST queue API directly so we stay async.
-    """
-    headers = {"Authorization": f"Key {fal_key}", "Content-Type": "application/json"}
-    payload = {
-        "prompt": prompt,
-        "image_size": image_size,
-        "num_inference_steps": 4,
-        "num_images": 1,
-        "enable_safety_checker": False,
-    }
-    async with httpx.AsyncClient(timeout=120) as client:
-        # Submit
-        submit = await client.post(
-            "https://queue.fal.run/fal-ai/flux/schnell",
-            headers=headers,
-            json=payload,
-        )
-        submit.raise_for_status()
-        request_id = submit.json()["request_id"]
+    """Submit a Flux Schnell job via fal-client SDK and return image bytes."""
+    os.environ["FAL_KEY"] = fal_key
 
-        # Poll
-        for _ in range(60):
-            await asyncio.sleep(2)
-            status = await client.get(
-                f"https://queue.fal.run/fal-ai/flux/schnell/requests/{request_id}/status",
-                headers=headers,
-            )
-            status.raise_for_status()
-            if status.json().get("status") == "COMPLETED":
-                break
+    handler = await fal_client.submit_async(
+        "fal-ai/flux/schnell",
+        arguments={
+            "prompt": prompt,
+            "image_size": image_size,
+            "num_inference_steps": 4,
+            "num_images": 1,
+            "enable_safety_checker": False,
+        },
+    )
+    result = await handler.get()
+    image_url = result["images"][0]["url"]
 
-        # Fetch result
-        result = await client.get(
-            f"https://queue.fal.run/fal-ai/flux/schnell/requests/{request_id}",
-            headers=headers,
-        )
-        result.raise_for_status()
-        image_url = result.json()["images"][0]["url"]
-
-        # Download image bytes
-        img_response = await client.get(image_url)
-        img_response.raise_for_status()
-        return img_response.content
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.get(image_url)
+        response.raise_for_status()
+        return response.content
 
 
 def _synthetic_png(label: str) -> bytes:
@@ -175,7 +152,7 @@ async def fill_coverage_gaps(gap_area_ids: list[str], facility_name: str) -> lis
     return [r for r in results if isinstance(r, dict)]
 
 
-async def generate_floor_plan(scene_graph: dict, facility_name: str) -> bytes:
+async def generate_floor_plan(scene_graph: dict, facility_name: str, *, prompt_override: str | None = None) -> bytes:
     """
     Generate a 2D architectural floor plan diagram from the scene graph.
     Returns raw image bytes (JPEG or synthetic PNG).
@@ -184,6 +161,9 @@ async def generate_floor_plan(scene_graph: dict, facility_name: str) -> bytes:
 
     if settings.use_synthetic_fallbacks or not settings.fal_key:
         return _synthetic_png("floor_plan")
+
+    if prompt_override:
+        return await _run_flux(prompt_override, settings.fal_key, image_size="square_hd")
 
     # Build a descriptive prompt from the scene graph
     rooms = []
