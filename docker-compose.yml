@@ -22,6 +22,13 @@ services:
       - "52773:52773"
     networks:
       - internal
+    healthcheck:
+      # IRIS is ready when the management portal returns HTTP 200
+      test: ["CMD-SHELL", "curl -sf http://localhost:52773/api/mgmnt/ -o /dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 60s
 
   backend:
     build:
@@ -29,11 +36,17 @@ services:
       dockerfile: backend/Dockerfile
     env_file:
       - .env.example
+    environment:
+      # Override localhost defaults from .env.example with Docker service hostnames
+      IRIS_HOST: iris
+      IRIS_FHIR_BASE: http://iris:52773/${MEDSENT_FHIR_PATH:-fhir/r4}
     volumes:
       - .:/app
     depends_on:
-      - iris
-      - redis
+      iris:
+        condition: service_healthy
+      redis:
+        condition: service_started
     ports:
       - "8000:8000"
     networks:

@@ -39,6 +39,8 @@ class MemoryIRISClient:
         self.findings_by_scan: defaultdict[str, list[Finding]] = defaultdict(list)
         self.coverage_maps: dict[str, CoverageMap] = {}
         self.upload_sessions: dict[str, dict[str, Any]] = {}
+        # In-memory FHIR resource cache: resourceType/id → resource dict
+        self._fhir_resources: dict[str, dict[str, Any]] = {}
         self._seed_demo_data()
 
     def _seed_demo_data(self) -> None:
@@ -447,6 +449,12 @@ class MemoryIRISClient:
         scan.findings = findings
         self.findings_by_scan[scan.scan_id] = findings
         self.scans[scan.scan_id] = scan
+        # Cache FHIR projections so get_*_resource returns stable resources
+        for finding in findings:
+            obs = build_observation(finding)
+            self._fhir_resources[f"Observation/{finding.finding_id}"] = obs
+        report = build_diagnostic_report(scan)
+        self._fhir_resources[f"DiagnosticReport/{scan.scan_id}"] = report
         return scan
 
     def list_findings(self, unit_id: str, domain: str | None = None, severity: str | None = None, room_id: str | None = None) -> list[Finding]:
@@ -477,16 +485,37 @@ class MemoryIRISClient:
         return sorted(models, key=lambda item: item.created_at)[-1]
 
     def get_diagnostic_report_resource(self, scan_id: str) -> dict[str, Any]:
+        cached = self._fhir_resources.get(f"DiagnosticReport/{scan_id}")
+        if cached:
+            return cached
         scan = self.scans.get(scan_id)
         if not scan:
             raise KeyError(scan_id)
         return build_diagnostic_report(scan)
 
     def get_observation_resource(self, finding_id: str) -> dict[str, Any]:
+        cached = self._fhir_resources.get(f"Observation/{finding_id}")
+        if cached:
+            return cached
         return build_observation(self.get_finding(finding_id))
 
     def push_diagnostic_report(self, scan_id: str, target: str | None = None) -> dict[str, Any]:
-        return {"status": "not_configured", "target": target, "scan_id": scan_id}
+        settings = get_settings()
+        destination = (target or settings.iris_health_connect_endpoint or "").rstrip("/")
+        if not destination:
+            return {"status": "not_configured", "target": target, "scan_id": scan_id}
+        report = self.get_diagnostic_report_resource(scan_id)
+        observations: list[dict[str, Any]] = []
+        for ref in report.get("result", []):
+            ref_id = ref.get("reference", "").split("/", 1)[-1]
+            if ref_id:
+                observations.append(self.get_observation_resource(ref_id))
+        fhir_client = FHIRRepositoryClient(
+            base_url=destination,
+            username=settings.iris_user,
+            password=settings.iris_password,
+        )
+        return fhir_client.push_bundle([*observations, report], target_base=destination)
 
 
 class NativeIRISClient:
