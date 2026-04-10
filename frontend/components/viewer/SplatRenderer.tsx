@@ -69,7 +69,7 @@ export function SplatRenderer({
 
         const viewer = new GS3D.Viewer({
           rootElement:            splatEl,
-          cameraUp:               [0, 1, 0],
+          cameraUp:               [0, -1, 0],
           initialCameraPosition:  [0, 1, 3],
           initialCameraLookAt:    [0, 0.5, 0],
           gpuAcceleratedSort:     false,

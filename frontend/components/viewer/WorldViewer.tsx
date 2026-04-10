@@ -301,7 +301,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
         const viewer = new GS3D.Viewer({
           rootElement:            splatEl,
           // Standard Y-up; World Labs SPZ models use conventional coordinate system
-          cameraUp:               [0, 1, 0],
+          cameraUp:               [0, -1, 0],
           initialCameraPosition:  [0, 1, 3],
           initialCameraLookAt:    [0, 0.5, 0],
           gpuAcceleratedSort:     false,
