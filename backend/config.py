@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     app_name: str = "MedSentinel"
     app_env: str = Field(default="development", alias="MEDSENTINEL_ENV")
-    iris_mode: Literal["memory", "native"] = Field(default="memory", alias="MEDSENTINEL_IRIS_MODE")
+    iris_mode: Literal["memory", "fhir", "native"] = Field(default="memory", alias="MEDSENTINEL_IRIS_MODE")
 
     iris_host: str = "localhost"
     iris_port: int = 1972

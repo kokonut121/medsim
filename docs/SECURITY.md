@@ -10,7 +10,9 @@
 ## Development Scaffold Notes
 
 - This repository uses a dev-safe in-memory persistence layer to mimic IRIS interfaces.
-- Native InterSystems wiring is available behind `MEDSENTINEL_IRIS_MODE=native`; production rollouts should still use locked-down networking, managed credentials, and audited roles.
+- `MEDSENTINEL_IRIS_MODE=memory` keeps all MedSentinel data in the local dev store.
+- `MEDSENTINEL_IRIS_MODE=fhir` uses the live IRIS FHIR repository for interoperability while keeping MedSentinel domain storage in the local dev store, which is useful when native IRIS global access is not provisioned yet.
+- `MEDSENTINEL_IRIS_MODE=native` uses direct IRIS globals plus the FHIR repository and requires the service account to have native global-access permissions.
 - `iris/init.sh` and `iris/MedSentinelInstaller.cls` bootstrap a `MEDSENT` foundation namespace, FHIR endpoint, wallet collection, baseline roles, and the `medsent_app` service account when invoked through `./scripts/bootstrap-iris.sh` for local and shared-dev environments.
 - Local Docker development intentionally avoids a durable IRIS data mount by default because InterSystems containers run as nonroot `irisowner` and require any mounted durable directory to be writable by UID `51773`.
 - The wallet bootstrap currently creates a secure wallet collection and its access resources; full database-at-rest encryption and enterprise key management still need production-specific rollout work.

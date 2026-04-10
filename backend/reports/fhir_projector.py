@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 
 from backend.models import Finding, Scan
@@ -36,6 +37,7 @@ _OBS_CATEGORY = {
 
 # MedSentinel extension base URL
 _EXT_BASE = "https://medsent.io/fhir/StructureDefinition"
+_FHIR_ID_INVALID_CHARS = re.compile(r"[^A-Za-z0-9\-.]")
 
 
 def _now_iso() -> str:
@@ -60,6 +62,13 @@ def _device_subject(unit_id: str) -> dict:
     return {"identifier": {"system": "https://medsent.io/units", "value": unit_id}}
 
 
+def fhir_safe_id(value: str) -> str:
+    sanitized = _FHIR_ID_INVALID_CHARS.sub("-", value).strip("-.")
+    if not sanitized:
+        sanitized = "medsent-resource"
+    return sanitized[:64]
+
+
 def build_diagnostic_report(scan: Scan) -> dict:
     timestamp = _scan_timestamp(scan)
 
@@ -76,10 +85,16 @@ def build_diagnostic_report(scan: Scan) -> dict:
 
     resource: dict = {
         "resourceType": "DiagnosticReport",
-        "id": scan.scan_id,
+        "id": fhir_safe_id(scan.scan_id),
         "meta": {
             "profile": [f"{_EXT_BASE}/MedSentinelDiagnosticReport"],
         },
+        "identifier": [
+            {
+                "system": "https://medsent.io/scans",
+                "value": scan.scan_id,
+            }
+        ],
         "status": "final",
         "category": [
             {
@@ -101,7 +116,7 @@ def build_diagnostic_report(scan: Scan) -> dict:
         "issued": timestamp,
         "conclusion": f"{len(scan.findings)} findings synthesized for unit {scan.unit_id}",
         "result": [
-            {"reference": f"Observation/{finding.finding_id}"}
+            {"reference": f"Observation/{fhir_safe_id(finding.finding_id)}"}
             for finding in scan.findings
         ],
     }
@@ -117,10 +132,16 @@ def build_observation(finding: Finding) -> dict:
 
     resource: dict = {
         "resourceType": "Observation",
-        "id": finding.finding_id,
+        "id": fhir_safe_id(finding.finding_id),
         "meta": {
             "profile": [f"{_EXT_BASE}/MedSentinelObservation"],
         },
+        "identifier": [
+            {
+                "system": "https://medsent.io/findings",
+                "value": finding.finding_id,
+            }
+        ],
         "status": "final",
         "category": [_OBS_CATEGORY],
         "code": {
