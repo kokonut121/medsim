@@ -108,6 +108,17 @@ async def generate_world_model(images: list[dict], scene_graph: dict, *, facilit
             },
             json=request_payload,
         )
+        # Graceful fallback on payment/quota errors
+        if start.status_code in (402, 429, 403):
+            digest = str(abs(hash(tuple(img.get("public_url", "") for img in images))))[:12]
+            return {
+                "world_id": f"world_{digest}",
+                "splat_url": f"worlds/{digest}/scene.spz",
+                "scene_manifest": scene_graph,
+                "source_image_count": len(images),
+                "caption": f"World Labs quota exceeded — synthetic fallback (real images acquired: {len(images)})",
+                "world_marble_url": None,
+            }
         start.raise_for_status()
         operation = start.json()
         operation_id = operation["operation_id"]

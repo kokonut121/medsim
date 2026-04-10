@@ -10,6 +10,7 @@ from backend.api.optimize import router as optimize_router
 from backend.api.reports import router as reports_router
 from backend.api.scans import router as scans_router
 from backend.api.upload import router as upload_router
+from backend.api.video import router as video_router
 from backend.api.websocket import router as websocket_router
 from backend.config import get_settings
 
@@ -28,6 +29,7 @@ app.include_router(models_router)
 app.include_router(optimize_router)
 app.include_router(scans_router)
 app.include_router(upload_router)
+app.include_router(video_router)
 app.include_router(fhir_router)
 app.include_router(reports_router)
 app.include_router(websocket_router)

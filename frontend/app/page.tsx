@@ -1,47 +1,25 @@
-import Link from "next/link";
+import { WorldViewer } from "@/components/viewer/WorldViewer";
 
-export default function LandingPage() {
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+
+async function getSplatUrl(): Promise<string> {
+  const fallback = `${API}/api/models/unit_1/splat/stream`;
+  try {
+    const res = await fetch(`${API}/api/models/unit_1/splat`, { cache: "no-store" });
+    if (!res.ok) return fallback;
+    const data = (await res.json()) as { stream_url?: string };
+    // stream_url is a relative path — prefix with API base
+    return data.stream_url ? `${API}${data.stream_url}` : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export default async function LandingPage() {
+  const splatUrl = await getSplatUrl();
   return (
-    <main className="shell">
-      <section className="hero">
-        <div className="eyebrow">MedSentinel</div>
-        <div className="hero-grid">
-          <div>
-            <h1>World models for hospital safety, streamed into action.</h1>
-            <p className="muted" style={{ fontSize: "1.1rem", maxWidth: 680 }}>
-              Select a facility, auto-acquire public imagery, synthesize a Gaussian-splat world model, and deploy
-              six specialized clinical safety agent teams with live findings in under 30 minutes.
-            </p>
-            <div className="cta-row">
-              <Link className="button" href="/dashboard">
-                Open dashboard
-              </Link>
-              <Link className="button secondary" href="/facility/new">
-                Onboard facility
-              </Link>
-            </div>
-          </div>
-          <div className="stats-grid">
-            <div className="stat">
-              <div className="eyebrow">Six domains</div>
-              <h3>HAI, meds, falls, code blue, flow, handoff</h3>
-            </div>
-            <div className="stat">
-              <div className="eyebrow">Security layer</div>
-              <h3>IRIS Secure Wallet, FHIR R4, RBAC, audit log</h3>
-            </div>
-            <div className="stat">
-              <div className="eyebrow">Frontend</div>
-              <h3>Next.js 15, Mapbox, React Three Fiber, live WebSockets</h3>
-            </div>
-            <div className="stat">
-              <div className="eyebrow">Output</div>
-              <h3>3D annotations, PDF exports, FHIR DiagnosticReports</h3>
-            </div>
-          </div>
-        </div>
-      </section>
+    <main className="demo-root">
+      <WorldViewer initialSplatUrl={splatUrl} />
     </main>
   );
 }
-

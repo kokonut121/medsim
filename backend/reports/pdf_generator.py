@@ -6,6 +6,7 @@ from io import BytesIO
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 from backend.db.iris_client import iris_client
@@ -29,6 +30,42 @@ def _fetch_floor_plan(unit_id: str) -> bytes | None:
         return None
 
 
+def _fetch_url_bytes(url: str) -> bytes | None:
+    try:
+        if url.startswith("file://") or url.startswith("FILE://"):
+            path = url.split("://", 1)[1]
+            with open(path, "rb") as fh:
+                return fh.read()
+        r = httpx.get(url, timeout=15)
+        r.raise_for_status()
+        return r.content
+    except Exception:
+        return None
+
+
+def _get_facility_images(unit_id: str) -> list[tuple[str, str]]:
+    """
+    Return (caption, public_url) pairs for fal.ai-generated facility images.
+    Reads from the iris_client image store for the facility that owns this unit.
+    """
+    try:
+        unit = next(
+            (u for u in iris_client.units.values() if u.unit_id == unit_id),
+            None,
+        )
+        if not unit:
+            return []
+        images = iris_client.list_images_for_facility(unit.facility_id)
+        results = []
+        for img in images:
+            if img.public_url:
+                caption = img.description or img.area_id or "Facility Image"
+                results.append((caption, img.public_url))
+        return results
+    except Exception:
+        return []
+
+
 def build_pdf(scan: Scan) -> bytes:
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=letter)
@@ -45,23 +82,79 @@ def build_pdf(scan: Scan) -> bytes:
 
     y = PAGE_H - 80
 
-    # ---- Floor plan ----
-    floor_plan_bytes = _fetch_floor_plan(scan.unit_id)
-    if floor_plan_bytes:
-        try:
-            img_buffer = BytesIO(floor_plan_bytes)
-            img_w = PAGE_W - 2 * MARGIN
-            img_h = 3 * inch
-            pdf.setFillColor(colors.HexColor("#f0f4f8"))
-            pdf.rect(MARGIN - 4, y - img_h - 4, img_w + 8, img_h + 24, fill=1, stroke=0)
-            pdf.setFillColor(colors.HexColor("#1a3c5e"))
-            pdf.setFont("Helvetica-Bold", 11)
-            pdf.drawString(MARGIN, y, "Facility Floor Plan")
-            y -= 16
-            pdf.drawInlineImage(img_buffer, MARGIN, y - img_h, width=img_w, height=img_h)
-            y -= img_h + 20
-        except Exception:
-            pass  # skip floor plan if image can't be rendered
+    # ---- Floor plan (before / after) ----
+    try:
+        model = iris_client.get_model(scan.unit_id)
+        sg = model.scene_graph_json
+        before_url = sg.get("floor_plan_before_url") or sg.get("floor_plan_url")
+        after_url  = sg.get("floor_plan_url") if sg.get("optimized") else None
+    except Exception:
+        before_url = after_url = None
+
+    def _draw_plan_image(label: str, img_bytes: bytes, cur_y: float) -> float:
+        img_w = PAGE_W - 2 * MARGIN
+        img_h = 3.2 * inch
+        if cur_y - img_h - 36 < MARGIN:
+            pdf.showPage()
+            cur_y = PAGE_H - MARGIN
+        pdf.setFillColor(colors.HexColor("#f0f4f8"))
+        pdf.rect(MARGIN - 4, cur_y - img_h - 4, img_w + 8, img_h + 24, fill=1, stroke=0)
+        pdf.setFillColor(colors.HexColor("#1a3c5e"))
+        pdf.setFont("Helvetica-Bold", 11)
+        pdf.drawString(MARGIN, cur_y, label)
+        cur_y -= 16
+        pdf.drawImage(ImageReader(BytesIO(img_bytes)), MARGIN, cur_y - img_h, width=img_w, height=img_h)
+        return cur_y - img_h - 20
+
+    if before_url:
+        b = _fetch_url_bytes(before_url)
+        if b:
+            y = _draw_plan_image("Current Layout", b, y)
+
+    if after_url and after_url != before_url:
+        b = _fetch_url_bytes(after_url)
+        if b:
+            y = _draw_plan_image("Optimized Layout", b, y)
+
+    # ---- fal.ai Facility Images ----
+    fal_images = _get_facility_images(scan.unit_id)
+    if fal_images:
+        if y < MARGIN + 80:
+            pdf.showPage()
+            y = PAGE_H - MARGIN
+        pdf.setFillColor(colors.HexColor("#1a3c5e"))
+        pdf.setFont("Helvetica-Bold", 12)
+        pdf.drawString(MARGIN, y, "AI-Generated Facility Images")
+        y -= 20
+
+        img_w = (PAGE_W - 2 * MARGIN - 12) / 2
+        img_h = 2.0 * inch
+        col = 0
+        row_start_y = y
+
+        for caption, url in fal_images[:6]:  # cap at 6 images
+            b = _fetch_url_bytes(url)
+            if not b:
+                continue
+            if col == 2:
+                col = 0
+                row_start_y -= img_h + 30
+                if row_start_y - img_h < MARGIN:
+                    pdf.showPage()
+                    row_start_y = PAGE_H - MARGIN - 20
+
+            x_pos = MARGIN + col * (img_w + 12)
+            try:
+                pdf.drawImage(ImageReader(BytesIO(b)), x_pos, row_start_y - img_h, width=img_w, height=img_h)
+                pdf.setFillColor(colors.HexColor("#555555"))
+                pdf.setFont("Helvetica-Oblique", 8)
+                pdf.drawString(x_pos, row_start_y - img_h - 10, caption[:55])
+            except Exception:
+                pass
+            col += 1
+
+        y = row_start_y - img_h - 30
+        y -= 10
 
     # ---- Domain summary ----
     pdf.setFillColor(colors.HexColor("#1a3c5e"))

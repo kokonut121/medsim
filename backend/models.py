@@ -10,7 +10,7 @@ Domain = Literal["ICA", "MSA", "FRA", "ERA", "PFA", "SCA"]
 Severity = Literal["CRITICAL", "HIGH", "ADVISORY"]
 ModelStatus = Literal["queued", "acquiring", "classifying", "generating", "ready", "failed"]
 ScanStatus = Literal["queued", "running", "synthesizing", "complete", "failed"]
-ImageSource = Literal["street_view", "places", "supplemental_upload", "world_labs"]
+ImageSource = Literal["street_view", "places", "supplemental_upload", "world_labs", "vr_video"]
 
 
 class SpatialAnchor(BaseModel):
