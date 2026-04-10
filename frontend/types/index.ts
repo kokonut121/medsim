@@ -98,3 +98,114 @@ export interface FacilityCreateInput {
   unit_type?: string;
   floor?: number;
 }
+
+// ---------------------------------------------------------------------------
+// Scenario simulation pathway
+// ---------------------------------------------------------------------------
+
+export type SimulationStatus = "queued" | "running" | "reasoning" | "complete" | "failed";
+export type InjurySeverity = "immediate" | "delayed" | "minor" | "expectant";
+export type ScenarioAgentKind =
+  | "incident_commander"
+  | "triage_officer"
+  | "burn_specialist"
+  | "trauma_surgeon"
+  | "anesthesiologist"
+  | "resource_allocator"
+  | "scenario_patient"
+  | "nurse"
+  | "doctor";
+
+export interface ScenarioAgentTrace {
+  agent_index: number;
+  kind: ScenarioAgentKind;
+  role_label: string;
+  actions: string[];
+  path: string[];
+  bottlenecks: string[];
+  resource_needs: string[];
+  patient_tags: InjurySeverity[];
+  notes: string;
+  efficiency_score: number;
+}
+
+export interface ScenarioSwarmAggregate {
+  facility_name: string;
+  scenario_prompt: string;
+  agents_run: number;
+  agents_per_role: number;
+  path_frequency: Record<string, number>;
+  bottleneck_counts: Record<string, number>;
+  resource_need_counts: Record<string, number>;
+  triage_mix: Partial<Record<InjurySeverity, number>>;
+  avg_efficiency: number;
+  efficiency_by_kind: Record<string, number>;
+  traces: ScenarioAgentTrace[];
+}
+
+export interface StaffPlacement {
+  room_id: string;
+  kind: ScenarioAgentKind | string;
+  count: number;
+  rationale: string;
+}
+
+export interface ResourceAllocationItem {
+  resource: string;
+  source_room_id: string | null;
+  destination_room_id: string;
+  quantity: number;
+  rationale: string;
+}
+
+export interface TriagePriority {
+  tier: InjurySeverity;
+  destination_room_id: string;
+  routing_rule: string;
+  staff_required: string[];
+}
+
+export interface TimelinePhase {
+  phase_label: string;
+  actions: string[];
+  decision_points: string[];
+}
+
+export interface BestPlan {
+  staff_placement: StaffPlacement[];
+  resource_allocation: ResourceAllocationItem[];
+  triage_priorities: TriagePriority[];
+  timeline: TimelinePhase[];
+  summary: string;
+  assumptions: string[];
+}
+
+export interface ScenarioSimulation {
+  simulation_id: string;
+  unit_id: string;
+  status: SimulationStatus;
+  scenario_prompt: string;
+  agents_per_role: number;
+  triggered_at: string;
+  completed_at: string | null;
+  failure_reason: string | null;
+  swarm_aggregate: ScenarioSwarmAggregate | null;
+  best_plan: BestPlan | null;
+}
+
+export interface RunSimulationResponse {
+  simulation_id: string;
+  unit_id: string;
+  status: SimulationStatus;
+}
+
+export type SimulationWsEvent =
+  | {
+      type: "status";
+      simulation_id: string;
+      status: SimulationStatus;
+      failure_reason?: string;
+    }
+  | ({ type: "agent_trace"; simulation_id: string } & ScenarioAgentTrace)
+  | { type: "reasoning_chunk"; simulation_id: string; text: string }
+  | { type: "complete"; simulation_id: string; simulation: ScenarioSimulation };

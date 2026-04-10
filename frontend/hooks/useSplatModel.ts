@@ -24,7 +24,12 @@ export function useSplatModel(unitId: string) {
         if (currentStatus.status === "ready") {
           const result = await api.getSplat(unitId);
           if (!cancelled) {
-            setSignedUrl(result.signed_url);
+            // Prefer the CORS-safe proxy stream URL over the direct R2 signed URL
+            const base = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+            const url = result.stream_url
+              ? `${base}${result.stream_url}`
+              : result.signed_url;
+            setSignedUrl(url);
             setError(null);
           }
         } else if (!cancelled) {

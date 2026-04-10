@@ -9,8 +9,8 @@ from uuid import uuid4
 
 from backend.config import Settings, get_settings
 from backend.db.fhir_repository import FHIRRepositoryClient
-from backend.models import CoverageArea, CoverageMap, Facility, FacilityCreate, Finding, GapArea, ImageMeta, Scan, Unit, WorldModel
 from backend.reports.fhir_projector import build_diagnostic_report, build_observation, fhir_safe_id
+from backend.models import CoverageArea, CoverageMap, Facility, FacilityCreate, Finding, GapArea, ImageMeta, Scan, ScenarioSimulation, Unit, WorldModel
 
 
 logger = logging.getLogger(__name__)
@@ -41,6 +41,8 @@ class MemoryIRISClient:
         self.upload_sessions: dict[str, dict[str, Any]] = {}
         # In-memory FHIR resource cache: resourceType/id → resource dict
         self._fhir_resources: dict[str, dict[str, Any]] = {}
+        self.simulations: dict[str, ScenarioSimulation] = {}
+        self.simulations_by_unit: defaultdict[str, list[str]] = defaultdict(list)
         self._seed_demo_data()
 
     def _seed_demo_data(self) -> None:
@@ -485,6 +487,37 @@ class MemoryIRISClient:
         if not models:
             raise KeyError(unit_id)
         return sorted(models, key=lambda item: item.created_at)[-1]
+
+    # ----- Scenario simulation persistence -------------------------------
+
+    def write_simulation(self, sim: ScenarioSimulation) -> ScenarioSimulation:
+        self.simulations[sim.simulation_id] = sim
+        if sim.simulation_id not in self.simulations_by_unit[sim.unit_id]:
+            self.simulations_by_unit[sim.unit_id].append(sim.simulation_id)
+        return sim
+
+    def update_simulation(self, simulation_id: str, **updates: object) -> ScenarioSimulation:
+        sim = self.simulations[simulation_id]
+        data = sim.model_dump()
+        for key, value in updates.items():
+            data[key] = value
+        updated = ScenarioSimulation.model_validate(data)
+        self.simulations[simulation_id] = updated
+        return updated
+
+    def get_simulation(self, simulation_id: str) -> ScenarioSimulation:
+        return self.simulations[simulation_id]
+
+    def list_simulations(self, unit_id: str) -> list[ScenarioSimulation]:
+        ids = self.simulations_by_unit.get(unit_id, [])
+        sims = [self.simulations[sid] for sid in ids if sid in self.simulations]
+        return sorted(sims, key=lambda item: item.triggered_at, reverse=True)
+
+    def get_latest_simulation(self, unit_id: str) -> ScenarioSimulation:
+        sims = self.list_simulations(unit_id)
+        if not sims:
+            raise KeyError(unit_id)
+        return sims[0]
 
     def get_diagnostic_report_resource(self, scan_id: str) -> dict[str, Any]:
         cached = self._fhir_resources.get(f"DiagnosticReport/{scan_id}")

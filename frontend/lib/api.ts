@@ -1,4 +1,15 @@
-import type { CoverageMap, Facility, FacilityCreateInput, Finding, ModelStatusResponse, Scan, Unit, WorldModel } from "@/types";
+import type {
+  CoverageMap,
+  Facility,
+  FacilityCreateInput,
+  Finding,
+  ModelStatusResponse,
+  RunSimulationResponse,
+  Scan,
+  ScenarioSimulation,
+  Unit,
+  WorldModel
+} from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
@@ -41,5 +52,14 @@ export const api = {
   getScanStatus: (unitId: string) => parse<Scan>(`/api/scans/${unitId}/status`),
   getFindings: (unitId: string) => parse<Finding[]>(`/api/scans/${unitId}/findings`),
   getSceneGraph: (unitId: string) => parse<Record<string, unknown>>(`/api/models/${unitId}/scene_graph`),
-  getSplat: (unitId: string) => parse<{ signed_url: string }>(`/api/models/${unitId}/splat`)
+  getSplat: (unitId: string) => parse<{ signed_url: string; stream_url?: string }>(`/api/models/${unitId}/splat`),
+  runSimulation: (unitId: string, scenarioPrompt: string, agentsPerRole = 3) =>
+    parse<RunSimulationResponse>(`/api/simulate/${unitId}/run`, {
+      method: "POST",
+      body: JSON.stringify({ scenario_prompt: scenarioPrompt, agents_per_role: agentsPerRole })
+    }),
+  getLatestSimulation: (unitId: string) =>
+    parse<ScenarioSimulation>(`/api/simulate/${unitId}/latest`),
+  listSimulations: (unitId: string) =>
+    parse<ScenarioSimulation[]>(`/api/simulate/${unitId}/list`)
 };

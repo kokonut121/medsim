@@ -25,10 +25,12 @@ def fresh_iris(monkeypatch):
     for module in (
         "backend.api.facilities",
         "backend.api.scans",
+        "backend.api.simulate",
         "backend.api.reports",
         "backend.api.models",
         "backend.api.fhir",
         "backend.agents.orchestrator",
+        "backend.simulation.scenario_runner",
     ):
         try:
             import importlib

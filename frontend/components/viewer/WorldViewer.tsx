@@ -261,7 +261,8 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
   const startTimeRef = useRef<number>(performance.now());
 
   const [splatUrl, setSplatUrl]     = useState<string>(initialSplatUrl ?? "");
-  const [loading, setLoading]       = useState(true);
+  const isIframeUrl = splatUrl.startsWith("https://marble.worldlabs.ai");
+  const [loading, setLoading]       = useState(!splatUrl.startsWith("https://marble.worldlabs.ai"));
   const [error, setError]           = useState<string | null>(null);
   const [openId, setOpenId]         = useState<string | null>(null);
 
@@ -282,9 +283,9 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
       .catch(() => setSplatUrl(FALLBACK_SPLAT));
   }, [splatUrl]);
 
-  // ── 2. Init Gaussian-splat viewer ─────────────────────────────────────────
+  // ── 2. Init Gaussian-splat viewer (skipped for iframe URLs) ──────────────
   useEffect(() => {
-    if (!splatUrl || !splatRef.current) return;
+    if (!splatUrl || !splatRef.current || isIframeUrl) return;
     const splatEl = splatRef.current;
     let disposed = false;
 
@@ -298,23 +299,24 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
         if (disposed) return;
 
         const viewer = new GS3D.Viewer({
-          rootElement:             splatEl,
-          cameraUp:                [0, -1, -0.6],
-          initialCameraPosition:   [-1, -2, 5],
-          initialCameraLookAt:     [0, 1, 0],
-          gpuAcceleratedSort:      true,
-          sharedMemoryForWorkers:  false,
-          antialiased:             true,
+          rootElement:            splatEl,
+          // Standard Y-up; World Labs SPZ models use conventional coordinate system
+          cameraUp:               [0, -1, 0],
+          initialCameraPosition:  [0, 1, 3],
+          initialCameraLookAt:    [0, 0.5, 0],
+          gpuAcceleratedSort:     false,
+          sharedMemoryForWorkers: false,
+          antialiased:            true,
         });
 
         await viewer.addSplatScene(splatUrl, {
-          format: splatUrl.endsWith(".spz") || splatUrl.endsWith(".bin")
+          // Force .spz for all proxy/stream URLs — they don't end in .spz but they're always .spz
+          format: (splatUrl.endsWith(".spz") || splatUrl.endsWith(".bin") ||
+                   splatUrl.includes("/splat/stream") || splatUrl.includes("/splat/"))
             ? GS3D.SceneFormat.Spz
             : undefined,
-          showLoadingUI:             false,
-          splatAlphaRemovalThreshold: 5,
-          position:                  [0, 1, 0],
-          scale:                     [1.2, 1.2, 1.2],
+          showLoadingUI:              false,
+          splatAlphaRemovalThreshold: 1,
         });
 
         if (disposed) { viewer.dispose(); return; }
@@ -399,8 +401,18 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
   return (
     <div ref={shellRef} className="world-shell">
 
-      {/* Viewer injects its canvas into this div — React never reconciles its children */}
-      <div ref={splatRef} style={{ position: "absolute", inset: 0 }} />
+      {/* WorldLabs iframe viewer — used when a marble.worldlabs.ai URL is provided */}
+      {isIframeUrl ? (
+        <iframe
+          src={splatUrl}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+          allow="xr-spatial-tracking; accelerometer; gyroscope"
+          title="World reconstruction"
+        />
+      ) : (
+        /* Gaussian-splat viewer injects its canvas here — React never reconciles children */
+        <div ref={splatRef} style={{ position: "absolute", inset: 0 }} />
+      )}
 
       {/* Loading / error states */}
       {loading && (
