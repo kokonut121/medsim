@@ -19,11 +19,10 @@ async function getSplatUrl(): Promise<string> {
 }
 
 export default async function LandingPage() {
-  // Use pre-built reconstruction; fall back to API-generated splat when ready
-  // const splatUrl = await getSplatUrl();
+  const splatUrl = await getSplatUrl();
   return (
     <main className="demo-root">
-      <WorldViewer initialSplatUrl={WORLD_RECONSTRUCTION_URL} />
+      <WorldViewer initialSplatUrl={splatUrl} />
     </main>
   );
 }
