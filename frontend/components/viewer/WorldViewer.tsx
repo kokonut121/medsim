@@ -550,6 +550,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
   const shellSizeRef = useRef({ width: 0, height: 0 });
   const frameRef = useRef<number>(0);
   const startTimeRef = useRef(0);
+  const keysRef = useRef<Set<string>>(new Set());
 
   const [splatUrl, setSplatUrl] = useState(initialSplatUrl ?? "");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -685,6 +686,23 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
     return () => observer.disconnect();
   }, []);
 
+  // WASD key tracking
+  useEffect(() => {
+    const onDown = (e: KeyboardEvent) => {
+      if (["w", "a", "s", "d", "W", "A", "S", "D"].includes(e.key)) {
+        e.preventDefault();
+        keysRef.current.add(e.key.toLowerCase());
+      }
+    };
+    const onUp = (e: KeyboardEvent) => { keysRef.current.delete(e.key.toLowerCase()); };
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+    return () => {
+      window.removeEventListener("keydown", onDown);
+      window.removeEventListener("keyup", onUp);
+    };
+  }, []);
+
   // RAF loop
   useEffect(() => {
     if (isIframeUrl || loading || error) return;
@@ -704,6 +722,31 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
       const viewer = viewerRef.current;
       const { width, height } = shellSizeRef.current;
       if (!viewer?.camera || width === 0 || height === 0) return;
+
+      // WASD camera movement
+      const keys = keysRef.current;
+      if (keys.size > 0) {
+        const MOVE_SPEED = 0.12;
+        const cam = viewer.camera;
+        const forward = new THREE.Vector3();
+        cam.getWorldDirection(forward);
+        forward.y = 0;
+        if (forward.lengthSq() > 0.0001) forward.normalize();
+        const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
+        right.y = 0;
+        if (right.lengthSq() > 0.0001) right.normalize();
+        const delta = new THREE.Vector3();
+        if (keys.has("w")) delta.addScaledVector(forward, MOVE_SPEED);
+        if (keys.has("s")) delta.addScaledVector(forward, -MOVE_SPEED);
+        if (keys.has("a")) delta.addScaledVector(right, -MOVE_SPEED);
+        if (keys.has("d")) delta.addScaledVector(right, MOVE_SPEED);
+        if (delta.lengthSq() > 0) {
+          cam.position.add(delta);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const controls = (viewer as any).controls ?? (viewer as any).orbitControls;
+          if (controls?.target) controls.target.add(delta);
+        }
+      }
 
       const trailCtx = trailCanvasRef.current?.getContext("2d") ?? null;
       if (trailCtx) trailCtx.clearRect(0, 0, width, height);
@@ -881,6 +924,16 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
         <span className="world-brand__logo">MedSim</span>
         <span className="world-brand__sub">LeTourneau University · Nursing Skills Lab · Live scan</span>
       </div>
+
+      {!isIframeUrl && !noModel && !loading && !error && (
+        <div className="world-wasd-hint">
+          <span className="world-wasd-key">W</span>
+          <span className="world-wasd-key">A</span>
+          <span className="world-wasd-key">S</span>
+          <span className="world-wasd-key">D</span>
+          <span className="world-wasd-label">move</span>
+        </div>
+      )}
 
       {liveFindings.length > 0 ? (
         <div className="world-ticker">
