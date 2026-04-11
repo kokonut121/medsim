@@ -1044,8 +1044,8 @@ tr:hover td {
 /* ═ Swarm agents ═ */
 .agent-marker {
   position: absolute;
-  width: 40px;
-  height: 28px;
+  width: 44px;
+  height: 40px;
   pointer-events: none;
   will-change: transform, opacity;
 }

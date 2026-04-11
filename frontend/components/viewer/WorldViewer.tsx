@@ -708,13 +708,17 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
             title={agent.role}
             style={{ color: agent.color, opacity: 0, visibility: "hidden" }}
           >
-            <svg viewBox="0 0 40 28" width="40" height="28" className="agent-fish">
-              {/* main wing */}
-              <polygon points="38,14 0,2 10,14" fill="currentColor" />
-              {/* lower wing */}
-              <polygon points="38,14 0,26 10,14" fill="currentColor" opacity="0.6" />
-              {/* fold crease */}
-              <line x1="10" y1="14" x2="38" y2="14" stroke="white" strokeWidth="0.8" opacity="0.4" />
+            <svg viewBox="0 0 44 40" width="44" height="40" className="agent-fish">
+              {/* left wing — top face, full brightness */}
+              <polygon points="22,2 0,26 22,26" fill="currentColor" />
+              {/* right wing — angled away, slightly dimmer */}
+              <polygon points="22,2 44,22 22,26" fill="currentColor" opacity="0.65" />
+              {/* fuselage front face */}
+              <rect x="16" y="26" width="12" height="12" rx="1" fill="currentColor" opacity="0.9" />
+              {/* fuselage right side — gives the 3D box depth */}
+              <polygon points="28,26 36,22 36,32 28,38" fill="currentColor" opacity="0.38" />
+              {/* center fold crease */}
+              <line x1="22" y1="2" x2="22" y2="38" stroke="white" strokeWidth="0.8" opacity="0.3" />
             </svg>
           </div>
         ))}
