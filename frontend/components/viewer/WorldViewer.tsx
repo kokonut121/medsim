@@ -287,7 +287,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
           if (cancelled) return;
           if (!findings.length) {
             // Trigger a scan and retry after a delay
-            fetch(buildApiUrl(`/api/scans/${UNIT_ID}/trigger`), { method: "POST" }).catch(() => null);
+            fetch(buildApiUrl(`/api/scans/${UNIT_ID}/run`), { method: "POST" }).catch(() => null);
             setTimeout(load, 4000);
             return;
           }
