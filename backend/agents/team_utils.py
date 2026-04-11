@@ -8,25 +8,25 @@ from backend.agents.consensus import SEVERITY_SCORES
 # ---------------------------------------------------------------------------
 # Grid → world-space coordinate mapping
 # ---------------------------------------------------------------------------
-_GRID_SCALE = 0.8
-_COL_ORIGIN = 2.0
-_ROW_ORIGIN = 1.5
+_GRID_SCALE = 3.5
+_COL_ORIGIN = 0.86
+_ROW_ORIGIN = 0.5
 _HALF       = _GRID_SCALE * 0.35   # intra-room offset radius
 
-# Default heights per equipment type (metres above floor)
+# Heights calibrated for model a97601cc (ground_plane_offset=1.467, metric_scale=0.913)
+# Y = 1.467 - real_height_m / 0.913
 _EQ_HEIGHT: dict[str, float] = {
-    "hand_hygiene_dispenser": 1.2,  # wall-mounted at arm reach
-    "crash_cart":             0.9,  # wheeled, top of cart
-    "monitor":                1.8,  # wall/ceiling arm
-    "ventilator":             1.1,  # floor unit, control panel height
-    "iv_pole":                1.4,  # hanging bag height
-    "call_light":             0.85, # bed-rail button
-    "workstation":            1.0,  # desk height
-    "adc":                    1.15, # dispensing cabinet drawer height
-    "defibrillator":          1.0,
-    "crash_cart":             0.9,
+    "hand_hygiene_dispenser": 0.15,  # 1.2m arm reach
+    "crash_cart":             0.48,  # 0.9m top of cart
+    "monitor":               -0.51,  # 1.8m wall/ceiling arm
+    "ventilator":             0.26,  # 1.1m control panel
+    "iv_pole":               -0.07,  # 1.4m hanging bag
+    "call_light":             0.54,  # 0.85m bed rail
+    "workstation":            0.37,  # 1.0m desk
+    "adc":                    0.21,  # 1.15m cabinet
+    "defibrillator":          0.37,  # ~1.0m
 }
-_DEFAULT_HEIGHT = 1.0
+_DEFAULT_HEIGHT = 0.37
 
 
 def _parse_position_offset(pos: str) -> tuple[float, float, float]:
