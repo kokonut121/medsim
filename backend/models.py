@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 
 Domain = Literal["ICA", "MSA", "FRA", "ERA", "PFA", "SCA"]
+PatientSex = Literal["male", "female", "unknown"]
 Severity = Literal["CRITICAL", "HIGH", "ADVISORY"]
 ModelStatus = Literal["queued", "acquiring", "classifying", "generating", "ready", "failed"]
 ScanStatus = Literal["queued", "running", "synthesizing", "complete", "failed"]
@@ -355,3 +356,50 @@ class ScenarioSimulation(BaseModel):
     swarm_aggregate: ScenarioSwarmAggregate | None = None
     reasoning_graph: ScenarioGraphSnapshot | None = None
     best_plan: BestPlan | None = None
+
+
+# ---------------------------------------------------------------------------
+# Patient intake — pre-hospital emergency records linked to the world model
+# ---------------------------------------------------------------------------
+
+class PatientVitals(BaseModel):
+    heart_rate: int | None = None
+    systolic_bp: int | None = None
+    diastolic_bp: int | None = None
+    spo2: int | None = None
+    gcs: int | None = None          # Glasgow Coma Scale 3–15
+    respiratory_rate: int | None = None
+
+
+class PatientIntake(BaseModel):
+    """Pre-hospital emergency record created when a patient calls for an ambulance.
+
+    Stored in IRIS (^MedSentinel.PatientIntake) and as FHIR Patient + Condition
+    resources so crisis simulations and post-crisis diagnostics can retrieve
+    relevant incoming cases by unit and semantic similarity.
+    """
+    intake_id: str
+    unit_id: str                       # links to the facility world model
+    chief_complaint: str               # e.g. "stab wound to left chest"
+    injury_severity: InjurySeverity
+    mechanism: str = ""                # e.g. "mass stabbing", "blunt trauma"
+    vitals: PatientVitals = Field(default_factory=PatientVitals)
+    eta_minutes: int | None = None
+    age_estimate: int | None = None
+    sex: PatientSex = "unknown"
+    received_at: datetime
+    fhir_patient_id: str | None = None
+    fhir_condition_id: str | None = None
+    embedding: list[float] = Field(default_factory=list)  # text-embedding for vector search
+
+
+class PatientIntakeCreate(BaseModel):
+    """Request body for POST /api/fhir/Patient/$intake."""
+    unit_id: str
+    chief_complaint: str = Field(min_length=3, max_length=500)
+    injury_severity: InjurySeverity
+    mechanism: str = ""
+    vitals: PatientVitals = Field(default_factory=PatientVitals)
+    eta_minutes: int | None = None
+    age_estimate: int | None = None
+    sex: PatientSex = "unknown"

@@ -361,12 +361,27 @@ async def run_scenario_simulation(
             },
         )
 
+    # Gather active patient intakes for this unit and embed a summary into
+    # the scenario prompt so agents know which patients are inbound.
+    patient_context = ""
+    try:
+        intakes = iris_client.list_patient_intakes(unit_id)
+        if intakes:
+            lines = [f"  - [{i.injury_severity.upper()}] {i.chief_complaint}"
+                     + (f" (ETA {i.eta_minutes} min)" if i.eta_minutes else "")
+                     + (f" — {i.mechanism}" if i.mechanism else "")
+                     for i in intakes[:10]]
+            patient_context = "\n--- INCOMING PATIENTS (pre-hospital FHIR intakes) ---\n" + "\n".join(lines)
+    except Exception:
+        pass
+
     # Augment the scenario prompt with spatial bundle summary + baseline findings
     # so every role agent reasons over the annotated facility state.
     augmented_prompt = (
         f"{scenario_prompt}\n\n"
         f"--- FACILITY SPATIAL CONTEXT ---\n{_bt(spatial_bundle)}\n\n"
         f"--- KNOWN SAFETY ISSUES ---\n{baseline_summary}"
+        f"{patient_context}"
     )
 
     try:

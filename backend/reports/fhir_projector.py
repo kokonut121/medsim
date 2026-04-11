@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-from backend.models import Finding, Scan
+from backend.models import Finding, PatientIntake, Scan
 
 # FHIR R4 requires code.coding on every Observation/DiagnosticReport.
 # We use LOINC for the report and SNOMED CT for individual findings.
@@ -192,5 +192,147 @@ def build_observation(finding: Finding) -> dict:
                 ]
             }
         ]
+
+    return resource
+
+
+# ---------------------------------------------------------------------------
+# Patient intake FHIR resources
+# ---------------------------------------------------------------------------
+
+# Mechanism keyword → ICD-10-CM code + display
+_MECHANISM_ICD10: list[tuple[list[str], str, str]] = [
+    (["stab", "puncture", "knife", "lacerat"],  "S21.9XXA", "Open wound, unspecified part of thorax, initial encounter"),
+    (["gunshot", "bullet", "firearm"],           "S21.9XXA", "Penetrating wound, initial encounter"),
+    (["burn", "fire", "scald", "thermal"],       "T30.0",    "Burn of unspecified body region, unspecified degree"),
+    (["crush", "blunt", "mvc", "motor vehicle"], "S09.90XA", "Unspecified injury of head, initial encounter"),
+    (["fall", "fell"],                            "W19.XXXA", "Unspecified fall, initial encounter"),
+    (["overdose", "poison", "toxic"],            "T65.91XA", "Toxic effects of unspecified substance, initial encounter"),
+    (["cardiac", "arrest", "chest pain"],        "I46.9",    "Cardiac arrest, cause unspecified"),
+]
+_DEFAULT_ICD10 = ("T14.90", "Injury, unspecified")
+
+
+def _icd10_for(complaint: str, mechanism: str) -> tuple[str, str]:
+    text = f"{complaint} {mechanism}".lower()
+    for keywords, code, display in _MECHANISM_ICD10:
+        if any(kw in text for kw in keywords):
+            return code, display
+    return _DEFAULT_ICD10
+
+
+_SEV_SNOMED = {
+    "immediate":  ("24484000",  "Severe (severity modifier)"),
+    "delayed":    ("6736007",   "Moderate (severity modifier)"),
+    "minor":      ("255604002", "Mild (severity modifier)"),
+    "expectant":  ("442452003", "Life threatening severity"),
+}
+
+
+def build_patient_resource(intake: PatientIntake) -> dict:
+    """Anonymous FHIR R4 Patient for a pre-hospital emergency intake."""
+    resource: dict = {
+        "resourceType": "Patient",
+        "id": fhir_safe_id(intake.fhir_patient_id or intake.intake_id),
+        "meta": {
+            "profile": [f"{_EXT_BASE}/MedSimEmergencyPatient"],
+        },
+        "identifier": [
+            {
+                "system": "https://medsent.io/patient-intakes",
+                "value": intake.intake_id,
+            }
+        ],
+        "active": True,
+        "name": [{"use": "anonymous", "text": f"Unknown-{intake.intake_id[-6:]}"}],
+        "gender": intake.sex if intake.sex != "unknown" else "unknown",
+    }
+    if intake.age_estimate is not None:
+        resource["extension"] = [
+            {
+                "url": f"{_EXT_BASE}/age-estimate",
+                "valueInteger": intake.age_estimate,
+            }
+        ]
+    return resource
+
+
+def build_condition_resource(intake: PatientIntake) -> dict:
+    """FHIR R4 Condition representing the patient's chief complaint + severity."""
+    icd_code, icd_display = _icd10_for(intake.chief_complaint, intake.mechanism)
+    sev_code, sev_display = _SEV_SNOMED.get(intake.injury_severity, ("24484000", "Severe"))
+    patient_id = fhir_safe_id(intake.fhir_patient_id or intake.intake_id)
+    condition_id = fhir_safe_id(intake.fhir_condition_id or f"cond-{intake.intake_id}")
+
+    resource: dict = {
+        "resourceType": "Condition",
+        "id": condition_id,
+        "meta": {
+            "profile": [f"{_EXT_BASE}/MedSimEmergencyCondition"],
+        },
+        "identifier": [
+            {
+                "system": "https://medsent.io/conditions",
+                "value": condition_id,
+            }
+        ],
+        "clinicalStatus": {
+            "coding": [
+                {
+                    "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+                    "code": "active",
+                }
+            ]
+        },
+        "category": [
+            {
+                "coding": [
+                    {
+                        "system": "http://terminology.hl7.org/CodeSystem/condition-category",
+                        "code": "encounter-diagnosis",
+                        "display": "Encounter Diagnosis",
+                    }
+                ]
+            }
+        ],
+        "severity": {
+            "coding": [
+                {
+                    "system": "http://snomed.info/sct",
+                    "code": sev_code,
+                    "display": sev_display,
+                }
+            ]
+        },
+        "code": {
+            "coding": [
+                {
+                    "system": "http://hl7.org/fhir/sid/icd-10-cm",
+                    "code": icd_code,
+                    "display": icd_display,
+                }
+            ],
+            "text": intake.chief_complaint,
+        },
+        "subject": {"reference": f"Patient/{patient_id}"},
+        "recordedDate": intake.received_at.isoformat(timespec="seconds"),
+        "note": [{"text": intake.mechanism}] if intake.mechanism else [],
+    }
+
+    # Attach vitals as FHIR extensions
+    vitals = intake.vitals
+    ext = []
+    if vitals.heart_rate is not None:
+        ext.append({"url": f"{_EXT_BASE}/vital-hr",  "valueInteger": vitals.heart_rate})
+    if vitals.systolic_bp is not None:
+        ext.append({"url": f"{_EXT_BASE}/vital-sbp", "valueInteger": vitals.systolic_bp})
+    if vitals.spo2 is not None:
+        ext.append({"url": f"{_EXT_BASE}/vital-spo2","valueInteger": vitals.spo2})
+    if vitals.gcs is not None:
+        ext.append({"url": f"{_EXT_BASE}/vital-gcs", "valueInteger": vitals.gcs})
+    if vitals.eta_minutes := intake.eta_minutes:
+        ext.append({"url": f"{_EXT_BASE}/eta-minutes","valueInteger": vitals.eta_minutes})
+    if ext:
+        resource["extension"] = ext
 
     return resource

@@ -10,7 +10,7 @@ from uuid import uuid4
 from backend.config import Settings, get_settings
 from backend.db.fhir_repository import FHIRRepositoryClient
 from backend.reports.fhir_projector import build_diagnostic_report, build_observation, fhir_safe_id
-from backend.models import CoverageArea, CoverageMap, DomainStatus, Facility, FacilityCreate, Finding, GapArea, ImageMeta, Scan, ScenarioSimulation, SpatialAnchor, Unit, WorldModel
+from backend.models import CoverageArea, CoverageMap, DomainStatus, Facility, FacilityCreate, Finding, GapArea, ImageMeta, PatientIntake, Scan, ScenarioSimulation, SpatialAnchor, Unit, WorldModel
 
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,8 @@ class MemoryIRISClient:
         self._fhir_resources: dict[str, dict[str, Any]] = {}
         self.simulations: dict[str, ScenarioSimulation] = {}
         self.simulations_by_unit: defaultdict[str, list[str]] = defaultdict(list)
+        self.patient_intakes: dict[str, "PatientIntake"] = {}
+        self.intakes_by_unit: defaultdict[str, list[str]] = defaultdict(list)
         self._seed_demo_data()
 
     def _seed_demo_data(self) -> None:
@@ -676,6 +678,67 @@ class MemoryIRISClient:
         if not sims:
             raise KeyError(unit_id)
         return sims[0]
+
+    # ------------------------------------------------------------------
+    # Patient intake (pre-hospital FHIR records + vector store)
+    # ------------------------------------------------------------------
+
+    def write_patient_intake(self, intake: "PatientIntake") -> "PatientIntake":
+        from backend.models import PatientIntake  # local import avoids circular
+        self.patient_intakes[intake.intake_id] = intake
+        if intake.intake_id not in self.intakes_by_unit[intake.unit_id]:
+            self.intakes_by_unit[intake.unit_id].append(intake.intake_id)
+        # Cache FHIR Patient + Condition resources
+        from backend.reports.fhir_projector import build_patient_resource, build_condition_resource
+        patient_res = build_patient_resource(intake)
+        condition_res = build_condition_resource(intake)
+        self._fhir_resources[f"Patient/{patient_res['id']}"] = patient_res
+        self._fhir_resources[f"Condition/{condition_res['id']}"] = condition_res
+        return intake
+
+    def get_patient_intake(self, intake_id: str) -> "PatientIntake":
+        intake = self.patient_intakes.get(intake_id)
+        if intake is None:
+            raise KeyError(intake_id)
+        return intake
+
+    def list_patient_intakes(self, unit_id: str) -> list["PatientIntake"]:
+        ids = self.intakes_by_unit.get(unit_id, [])
+        intakes = [self.patient_intakes[i] for i in ids if i in self.patient_intakes]
+        return sorted(intakes, key=lambda x: x.received_at, reverse=True)
+
+    def search_similar_intakes(
+        self,
+        query_embedding: list[float],
+        unit_id: str,
+        top_k: int = 5,
+    ) -> list["PatientIntake"]:
+        """Return up to top_k intakes for unit_id ranked by cosine similarity.
+
+        In memory mode this runs Python cosine similarity over stored embeddings.
+        In NativeIRISClient this would use IRIS SQL VECTOR_COSINE().
+        """
+        from backend.pipeline.patient_embedder import cosine_similarity
+        candidates = self.list_patient_intakes(unit_id)
+        scored = [
+            (cosine_similarity(query_embedding, intake.embedding), intake)
+            for intake in candidates
+            if intake.embedding
+        ]
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [intake for _, intake in scored[:top_k]]
+
+    def get_patient_fhir_resource(self, patient_id: str) -> dict[str, Any]:
+        res = self._fhir_resources.get(f"Patient/{patient_id}")
+        if res is None:
+            raise KeyError(patient_id)
+        return res
+
+    def get_condition_fhir_resource(self, condition_id: str) -> dict[str, Any]:
+        res = self._fhir_resources.get(f"Condition/{condition_id}")
+        if res is None:
+            raise KeyError(condition_id)
+        return res
 
     def get_diagnostic_report_resource(self, scan_id: str) -> dict[str, Any]:
         cached = self._fhir_resources.get(f"DiagnosticReport/{scan_id}")
