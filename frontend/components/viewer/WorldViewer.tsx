@@ -46,7 +46,8 @@ interface AgentPathDef extends AgentDef {
 
 const TARGET_OVERLAY_FPS = 30;
 const LIVE_FINDINGS_LIMIT = 5;
-const AGENT_TRAIL_PARTICLES = 6;
+// ~2 seconds of motion at TARGET_OVERLAY_FPS — length of the dotted contrail.
+const AGENT_TRAIL_SAMPLES = 60;
 const UNIT_ID = "unit_1";
 
 // Grid → world coordinate mapping (must match backend team_utils.py)
@@ -238,50 +239,60 @@ function interpolatePath(
   );
 }
 
-function updateAgentTrail(
-  trailNodes: Array<HTMLSpanElement | null>,
+function drawAgentTrail(
+  ctx: CanvasRenderingContext2D,
   history: ScreenPos[],
   position: ScreenPos,
+  color: string,
 ) {
   if (!position.visible) {
     history.length = 0;
-    for (const node of trailNodes) {
-      if (!node) {
-        continue;
-      }
-      node.style.opacity = "0";
-      node.style.visibility = "hidden";
-    }
     return;
   }
 
   history.unshift(position);
-  history.length = Math.min(history.length, AGENT_TRAIL_PARTICLES + 1);
+  history.length = Math.min(history.length, AGENT_TRAIL_SAMPLES);
 
-  for (let index = 0; index < AGENT_TRAIL_PARTICLES; index += 1) {
-    const node = trailNodes[index];
-    const sample = history[index + 1];
+  if (history.length < 2) return;
 
-    if (!node || !sample?.visible) {
-      if (node) {
-        node.style.opacity = "0";
-        node.style.visibility = "hidden";
-      }
-      continue;
-    }
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
 
-    const dx = sample.x - position.x;
-    const dy = sample.y - position.y;
-    const distance = Math.hypot(dx, dy);
-    const opacity = Math.max(0.08, 0.42 - index * 0.06);
-    const scale = Math.max(0.5, 1 - index * 0.08);
-
-    node.style.opacity = `${opacity}`;
-    node.style.visibility = "visible";
-    node.style.transform =
-      `translate3d(${dx}px, ${dy}px, 0) translate(-50%, -50%) scale(${scale})`;
-    node.style.filter = `blur(${Math.min(5, 1.2 + distance * 0.04)}px)`;
+  // Pass 1 — dark halo underlay so the contrail stays readable over bright
+  // splat regions. Solid (no dash), slightly thicker than the colored stroke.
+  ctx.setLineDash([]);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#000000";
+  for (let i = 0; i < history.length - 1; i += 1) {
+    const a = history[i];
+    const b = history[i + 1];
+    if (!a.visible || !b.visible) continue;
+    const t = i / (history.length - 1);
+    ctx.globalAlpha = (1 - t) * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
   }
+
+  // Pass 2 — dotted color stroke. globalAlpha ramps 0.75 → 0 head-to-tail.
+  ctx.setLineDash([2, 6]);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = color;
+  for (let i = 0; i < history.length - 1; i += 1) {
+    const a = history[i];
+    const b = history[i + 1];
+    if (!a.visible || !b.visible) continue;
+    const t = i / (history.length - 1);
+    ctx.globalAlpha = (1 - t) * 0.75;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.setLineDash([]);
 }
 
 function updateProjectedElement(
@@ -369,9 +380,9 @@ function FloorPlan({
 export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const splatRef = useRef<HTMLDivElement>(null);
+  const trailCanvasRef = useRef<HTMLCanvasElement>(null);
   const annotationRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const agentRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const agentTrailRefs = useRef<Record<string, Array<HTMLSpanElement | null>>>({});
   const agentTrailHistoryRef = useRef<Record<string, ScreenPos[]>>({});
   const shellSizeRef = useRef({ width: 0, height: 0 });
   const frameRef = useRef<number>(0);
@@ -477,12 +488,27 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
     return () => { cancelled = true; };
   }, []);
 
-  // Shell resize observer
+  // Shell resize observer — also keeps the trail canvas backing store in sync.
   useEffect(() => {
     const shell = shellRef.current;
     if (!shell) return;
     const updateSize = () => {
-      shellSizeRef.current = { width: shell.clientWidth, height: shell.clientHeight };
+      const width = shell.clientWidth;
+      const height = shell.clientHeight;
+      shellSizeRef.current = { width, height };
+
+      const canvas = trailCanvasRef.current;
+      if (canvas) {
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        const ctx = canvas.getContext("2d");
+        // setTransform resets each time we set canvas.width/height, so re-apply
+        // the DPR scale here. Drawing then happens in CSS-pixel coordinates.
+        if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
     };
     updateSize();
     const observer = new ResizeObserver(updateSize);
@@ -508,6 +534,9 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
       const viewer = viewerRef.current;
       const { width, height } = shellSizeRef.current;
       if (!viewer?.camera || width === 0 || height === 0) return;
+
+      const trailCtx = trailCanvasRef.current?.getContext("2d") ?? null;
+      if (trailCtx) trailCtx.clearRect(0, 0, width, height);
 
       for (const annotation of annotations) {
         annotationVector.set(...annotation.worldPos);
@@ -535,7 +564,11 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
         );
         const trailHistory = agentTrailHistoryRef.current[agent.id] ?? [];
         agentTrailHistoryRef.current[agent.id] = trailHistory;
-        updateAgentTrail(agentTrailRefs.current[agent.id] ?? [], trailHistory, screenPosition);
+        if (trailCtx) {
+          drawAgentTrail(trailCtx, trailHistory, screenPosition, agent.color);
+        } else if (!screenPosition.visible) {
+          trailHistory.length = 0;
+        }
       }
     };
 
@@ -607,6 +640,8 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
         </div>
       ) : null}
 
+      <canvas ref={trailCanvasRef} className="agent-trail-canvas" />
+
       <div className="world-overlay">
         {annotations.map((annotation) => {
           const color = SEV_COLOR[annotation.severity];
@@ -673,15 +708,6 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
             title={agent.role}
             style={{ color: agent.color, opacity: 0, visibility: "hidden" }}
           >
-            {Array.from({ length: AGENT_TRAIL_PARTICLES }, (_, index) => (
-              <span
-                key={`${agent.id}-trail-${index}`}
-                ref={(node) => {
-                  (agentTrailRefs.current[agent.id] ??= [])[index] = node;
-                }}
-                className="agent-trail"
-              />
-            ))}
             <span className="agent-dot" />
           </div>
         ))}
