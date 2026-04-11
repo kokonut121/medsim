@@ -1,5 +1,5 @@
 {
-  "serverName": "MedSentinelFHIR",
+  "serverName": "MedSimFHIR",
   "endpointPath": "/fhir/r4",
   "fhirVersion": "R4",
   "strategy": "repository",
@@ -7,5 +7,5 @@
   "metadataPackage": "hl7.fhir.r4.core@4.0.1",
   "namespace": "MEDSENT",
   "appUser": "medsent_app",
-  "walletCollection": "MedSentinel"
+  "walletCollection": "MedSim"
 }

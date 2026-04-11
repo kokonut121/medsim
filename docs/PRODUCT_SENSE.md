@@ -1,6 +1,6 @@
 # Product Sense
 
-MedSentinel exists to shorten the path from spatial risk to action.
+MedSim exists to shorten the path from spatial risk to action.
 
 - Every major workflow should reduce time-to-triage for clinicians and safety officers.
 - Labels must be plain clinical English.

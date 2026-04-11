@@ -1,8 +1,8 @@
-# MedSentinel Impact Evidence Base for Trauma and Hospital Flow
+# MedSim Impact Evidence Base for Trauma and Hospital Flow
 
 ## Executive summary
 
-MedSentinel's core thesis—that many "efficiency" failures in acute care are actually **space-and-time failures** (where people/equipment/patients are, and when handoffs/delays occur)—maps tightly to what national, specialty, and peer‑reviewed sources describe as the dominant constraints in modern hospital operations: rising emergency demand, limited inpatient capacity, uneven trauma access, and avoidable variation in time-critical care delivery.
+MedSim's core thesis—that many "efficiency" failures in acute care are actually **space-and-time failures** (where people/equipment/patients are, and when handoffs/delays occur)—maps tightly to what national, specialty, and peer‑reviewed sources describe as the dominant constraints in modern hospital operations: rising emergency demand, limited inpatient capacity, uneven trauma access, and avoidable variation in time-critical care delivery.
 
 The U.S. scale is large enough that even small operational shifts can translate into meaningful lives and dollars: **271,729 injury deaths in 2024** (~744/day) and **197,449 unintentional injury deaths in 2024** (~541/day) are recorded in CDC/NCHS vital statistics. Meanwhile, EDs handled **~139.8 million visits in 2024**, and a major forecasting house (Sg2) projects **ED volumes +5% over the next decade** (2025–2035).
 
@@ -48,7 +48,7 @@ For "where concentrated" slides, the message is not just rural/urban; it is also
 
 ### Trauma registries and the "visibility gap" problem
 
-ACS notes that trauma systems often cannot track patients across the continuum (prehospital → hospital → post-acute), and includes a striking analogy: logistics companies can track packages end-to-end, but the trauma system often cannot track patients comparably. This directly supports MedSentinel's "real-time spatial intelligence" narrative.
+ACS notes that trauma systems often cannot track patients across the continuum (prehospital → hospital → post-acute), and includes a striking analogy: logistics companies can track packages end-to-end, but the trauma system often cannot track patients comparably. This directly supports MedSim's "real-time spatial intelligence" narrative.
 
 Separately, ACS Trauma Quality Programs explicitly warn that their research datasets are broad but **should not be used to make national estimates** because participation is not necessarily nationally representative. This citation is valuable for credibility: the deck can transparently distinguish **national (CDC/NCHS)** from **registry participating-center** statistics.
 
@@ -84,7 +84,7 @@ A Level I trauma center panel-review study (2005–2015) quantifies failure-to-r
 
 Source: https://pubmed.ncbi.nlm.nih.gov/27788924/
 
-This is an unusually actionable breakdown for decks because it both (a) quantifies the "complication funnel," and (b) prevents overclaiming: a large share of deaths after complications may not be deemed preventable even on retrospective review. The "MedSentinel" wedge then becomes: shrink the numerator of complications, and shorten the time to detection/response when complications occur.
+This is an unusually actionable breakdown for decks because it both (a) quantifies the "complication funnel," and (b) prevents overclaiming: a large share of deaths after complications may not be deemed preventable even on retrospective review. The "MedSim" wedge then becomes: shrink the numerator of complications, and shorten the time to detection/response when complications occur.
 
 ---
 
@@ -129,7 +129,7 @@ A multi-center trauma registry analysis developed the Trauma Surge Index (TSI) a
 
 Source: https://pubmed.ncbi.nlm.nih.gov/26232304/
 
-This provides a clean narrative bridge: MedSentinel's real-time spatial + operational awareness is designed to surface capacity strain early—before it converts into mortality risk.
+This provides a clean narrative bridge: MedSim's real-time spatial + operational awareness is designed to surface capacity strain early—before it converts into mortality risk.
 
 ---
 

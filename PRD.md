@@ -1,4 +1,4 @@
-# MedSentinel — Product Requirements Document
+# MedSim — Product Requirements Document
 
 > AI World Model + Agent Orchestration Network for Hospital Safety & Operations Intelligence  
 > Version 1.1 | Built for Harvard's HSIL Hackathon
@@ -26,11 +26,11 @@
 
 ## 1. Product Overview
 
-MedSentinel constructs a navigable 3D world model of any hospital facility from **publicly available imagery** (Google Street View, Google Places Photos, OpenStreetMap) — no manual bulk photo upload required — then deploys six specialized AI agent teams into that model to identify, annotate, and rank critical safety weaknesses.
+MedSim constructs a navigable 3D world model of any hospital facility from **publicly available imagery** (Google Street View, Google Places Photos, OpenStreetMap) — no manual bulk photo upload required — then deploys six specialized AI agent teams into that model to identify, annotate, and rank critical safety weaknesses.
 
 All data is secured through **InterSystems IRIS for Health**, which provides HIPAA-grade encryption (Secure Wallet), FHIR R4 interoperability, role-based access control, and full audit logging as a native healthcare data platform.
 
-MedSentinel is built on top of the World Labs Gaussian-splat world model libraries, combining Google Street View image acquisition, Modal-hosted agent teams, Redis pub/sub consensus aggregation, and a React Three Fiber frontend — with hospital-domain agent specialization and InterSystems IRIS as the data security backbone.
+MedSim is built on top of the World Labs Gaussian-splat world model libraries, combining Google Street View image acquisition, Modal-hosted agent teams, Redis pub/sub consensus aggregation, and a React Three Fiber frontend — with hospital-domain agent specialization and InterSystems IRIS as the data security backbone.
 
 ### Core Value Proposition
 
@@ -113,16 +113,16 @@ iris:
 
 ### 4.2 Capabilities Used
 
-| IRIS Feature | MedSentinel Usage | Implementation |
+| IRIS Feature | MedSim Usage | Implementation |
 |---|---|---|
-| **Secure Wallet** | Encrypts all facility, scan, and findings data at rest using IRISSECURITY database | Initialize on first deploy: `do ##class(Security.Wallet).Create("MedSentinel")` |
+| **Secure Wallet** | Encrypts all facility, scan, and findings data at rest using IRISSECURITY database | Initialize on first deploy: `do ##class(Security.Wallet).Create("MedSim")` |
 | **FHIR R4 Repository** | Stores findings as `DiagnosticReport` and `Observation` FHIR resources for EHR integration | Enable via IRIS FHIR Server configuration; exposed on `/fhir/r4/` endpoint |
 | **HL7 V2 / ADT Feed** | Receives optional real-time bed census from hospital system (no PHI stored — only aggregate unit occupancy) | Health Connect inbound HL7 adapter; ADT A01/A03 events → unit occupancy counter |
-| **IntegratedML** | In-database unit risk trend models — trained and executed inside IRIS on findings data, no extraction needed | `CREATE MODEL UnitRiskScore PREDICTING (riskScore) FROM MedSentinel.Finding` |
+| **IntegratedML** | In-database unit risk trend models — trained and executed inside IRIS on findings data, no extraction needed | `CREATE MODEL UnitRiskScore PREDICTING (riskScore) FROM MedSim.Finding` |
 | **RBAC** | Role enforcement at data layer: SafetyOfficer (all), UnitManager (unit-scoped), Auditor (read-only) | Define roles in IRIS security manager; enforced on all global access |
 | **Audit Logging** | Every read/write/export logged with user, timestamp, action — required for Joint Commission documentation | Enabled in IRIS audit configuration; log shipped to SIEM |
 | **Vector Search (HNSW)** | Semantic search across findings: "find all findings similar to this crash cart obstruction pattern" | Store finding text embeddings as `VECTOR(1536)` column; query with `VECTOR_DOT_PRODUCT` |
-| **Health Connect Cloud** | Managed FHIR pipeline to hospital EHR (Epic/Cerner) — MedSentinel pushes DiagnosticReport on scan completion | Configure Health Connect FHIR interoperability production; target endpoint = hospital FHIR server |
+| **Health Connect Cloud** | Managed FHIR pipeline to hospital EHR (Epic/Cerner) — MedSim pushes DiagnosticReport on scan completion | Configure Health Connect FHIR interoperability production; target endpoint = hospital FHIR server |
 
 ### 4.3 Python Integration
 
@@ -142,7 +142,7 @@ class IRISClient:
 
     def write_finding(self, finding: Finding) -> str:
         """Write a finding to IRIS globals via Secure Wallet encrypted storage."""
-        gref = iris.gref("^MedSentinel.Finding")
+        gref = iris.gref("^MedSim.Finding")
         finding_id = self._new_id()
         gref[finding_id] = iris.list(
             finding.scan_id,
@@ -167,7 +167,7 @@ class IRISClient:
             "resourceType": "DiagnosticReport",
             "id": finding_id,
             "status": "final",
-            "code": {"text": f"MedSentinel {finding.domain} Finding"},
+            "code": {"text": f"MedSim {finding.domain} Finding"},
             "conclusion": finding.label_text,
             "conclusionCode": [{"text": finding.severity}],
         }
@@ -738,29 +738,29 @@ async def acquire_images_for_facility(facility_id: str, address: str):
 ### 9.1 IRIS Globals Schema
 
 ```
-^MedSentinel.Facility(facilityId)
+^MedSim.Facility(facilityId)
   = $LB(name, address, lat, lng, orgId, googlePlaceId, osmBuildingId, createdAt)
 
-^MedSentinel.Unit(unitId)
+^MedSim.Unit(unitId)
   = $LB(facilityId, name, floor, unitType, createdAt)
 
-^MedSentinel.ImageMeta(imgId)
+^MedSim.ImageMeta(imgId)
   = $LB(facilityId, r2Key, category, confidence, source, createdAt)
   source ∈ {street_view, places_photos, osm_derived, supplemental_upload}
 
-^MedSentinel.WorldModel(modelId)
+^MedSim.WorldModel(modelId)
   = $LB(unitId, status, splatR2Key, sceneGraphJson, worldLabsWorldId, createdAt, completedAt)
   status ∈ {queued, acquiring, classifying, generating, ready, failed}
 
-^MedSentinel.Scan(scanId)
+^MedSim.Scan(scanId)
   = $LB(unitId, modelId, status, triggeredAt, completedAt)
   status ∈ {queued, running, synthesizing, complete, failed}
 
-^MedSentinel.ScanDomainStatus(scanId, domain)
+^MedSim.ScanDomainStatus(scanId, domain)
   = $LB(status, findingCount, startedAt, completedAt)
   domain ∈ {ICA, MSA, FRA, ERA, PFA, SCA}
 
-^MedSentinel.Finding(findingId)
+^MedSim.Finding(findingId)
   = $LB(scanId, domain, subAgent, roomId, severity, compoundSeverity,
         labelText, spatialAnchorJson, confidence, evidenceR2KeysJson,
         recommendation, compoundDomainsJson, createdAt)
@@ -1071,4 +1071,4 @@ medsent/
 
 ---
 
-*MedSentinel PRD v1.1 — For Engineering Implementation*
+*MedSim PRD v1.1 — For Engineering Implementation*

@@ -1,4 +1,4 @@
-Class MedSentinel.Installer Extends %RegisteredObject
+Class MedSim.Installer Extends %RegisteredObject
 {
 
 ClassMethod Main() As %Status
@@ -9,48 +9,48 @@ ClassMethod Main() As %Status
     set fhirPath=..NormalizePath(..Env("MEDSENT_FHIR_PATH","/fhir/r4"))
     set fhirMetadata=..Env("MEDSENT_FHIR_METADATA_PACKAGE","hl7.fhir.r4.core@4.0.1")
     set fhirStrategy=..Env("MEDSENT_FHIR_STRATEGY_CLASS","HS.FHIRServer.Storage.Json.InteractionsStrategy")
-    set serverName=..Env("MEDSENT_SERVER_NAME","MedSentinelFHIR")
-    set walletCollection=..Env("MEDSENT_WALLET_COLLECTION","MedSentinel")
-    set serviceRole=..Env("MEDSENT_SERVICE_ROLE","MedSentinel_Service")
+    set serverName=..Env("MEDSENT_SERVER_NAME","MedSimFHIR")
+    set walletCollection=..Env("MEDSENT_WALLET_COLLECTION","MedSim")
+    set serviceRole=..Env("MEDSENT_SERVICE_ROLE","MedSim_Service")
 
-    write !,"[MedSentinel] Ensuring audit is enabled"
+    write !,"[MedSim] Ensuring audit is enabled"
     set sc=..CheckStatus(..EnsureAuditEnabled(),"Unable to enable auditing")
     if $SYSTEM.Status.IsError(sc) quit sc
 
-    write !,"[MedSentinel] Ensuring resources and baseline roles exist"
-    set sc=..CheckStatus(..EnsureResource("MedSentinel_Data","MedSentinel application data resource"),"Unable to create MedSentinel_Data")
+    write !,"[MedSim] Ensuring resources and baseline roles exist"
+    set sc=..CheckStatus(..EnsureResource("MedSim_Data","MedSim application data resource"),"Unable to create MedSim_Data")
     if $SYSTEM.Status.IsError(sc) quit sc
-    set sc=..CheckStatus(..EnsureResource("MedSentinel_Wallet_Use","Use MedSentinel wallet secrets"),"Unable to create MedSentinel_Wallet_Use")
+    set sc=..CheckStatus(..EnsureResource("MedSim_Wallet_Use","Use MedSim wallet secrets"),"Unable to create MedSim_Wallet_Use")
     if $SYSTEM.Status.IsError(sc) quit sc
-    set sc=..CheckStatus(..EnsureResource("MedSentinel_Wallet_Edit","Edit MedSentinel wallet secrets"),"Unable to create MedSentinel_Wallet_Edit")
+    set sc=..CheckStatus(..EnsureResource("MedSim_Wallet_Edit","Edit MedSim wallet secrets"),"Unable to create MedSim_Wallet_Edit")
     if $SYSTEM.Status.IsError(sc) quit sc
-    set sc=..CheckStatus(..EnsureResource("MedSentinel_FHIR_Use","Read MedSentinel FHIR resources"),"Unable to create MedSentinel_FHIR_Use")
+    set sc=..CheckStatus(..EnsureResource("MedSim_FHIR_Use","Read MedSim FHIR resources"),"Unable to create MedSim_FHIR_Use")
     if $SYSTEM.Status.IsError(sc) quit sc
-    set sc=..CheckStatus(..EnsureResource("MedSentinel_FHIR_Edit","Write MedSentinel FHIR resources"),"Unable to create MedSentinel_FHIR_Edit")
-    if $SYSTEM.Status.IsError(sc) quit sc
-
-    set sc=..CheckStatus(..EnsureRole("MedSentinel_SafetyOfficer","Full MedSentinel safety access","MedSentinel_Data:RWU,MedSentinel_Wallet_Use:U,MedSentinel_Wallet_Edit:W,MedSentinel_FHIR_Use:U,MedSentinel_FHIR_Edit:W",""),"Unable to create SafetyOfficer role")
-    if $SYSTEM.Status.IsError(sc) quit sc
-    set sc=..CheckStatus(..EnsureRole("MedSentinel_UnitManager","Scoped MedSentinel operational access","MedSentinel_Data:RW,MedSentinel_Wallet_Use:U,MedSentinel_FHIR_Use:U,MedSentinel_FHIR_Edit:W",""),"Unable to create UnitManager role")
-    if $SYSTEM.Status.IsError(sc) quit sc
-    set sc=..CheckStatus(..EnsureRole("MedSentinel_Auditor","Read-only MedSentinel audit access","MedSentinel_Data:R,MedSentinel_FHIR_Use:U",""),"Unable to create Auditor role")
+    set sc=..CheckStatus(..EnsureResource("MedSim_FHIR_Edit","Write MedSim FHIR resources"),"Unable to create MedSim_FHIR_Edit")
     if $SYSTEM.Status.IsError(sc) quit sc
 
-    write !,"[MedSentinel] Ensuring secure wallet collection exists"
-    set sc=..CheckStatus(..EnsureWalletCollection(walletCollection,"MedSentinel_Wallet_Use","MedSentinel_Wallet_Edit"),"Unable to create wallet collection")
+    set sc=..CheckStatus(..EnsureRole("MedSim_SafetyOfficer","Full MedSim safety access","MedSim_Data:RWU,MedSim_Wallet_Use:U,MedSim_Wallet_Edit:W,MedSim_FHIR_Use:U,MedSim_FHIR_Edit:W",""),"Unable to create SafetyOfficer role")
+    if $SYSTEM.Status.IsError(sc) quit sc
+    set sc=..CheckStatus(..EnsureRole("MedSim_UnitManager","Scoped MedSim operational access","MedSim_Data:RW,MedSim_Wallet_Use:U,MedSim_FHIR_Use:U,MedSim_FHIR_Edit:W",""),"Unable to create UnitManager role")
+    if $SYSTEM.Status.IsError(sc) quit sc
+    set sc=..CheckStatus(..EnsureRole("MedSim_Auditor","Read-only MedSim audit access","MedSim_Data:R,MedSim_FHIR_Use:U",""),"Unable to create Auditor role")
     if $SYSTEM.Status.IsError(sc) quit sc
 
-    write !,"[MedSentinel] Ensuring namespace "_ns_" exists"
+    write !,"[MedSim] Ensuring secure wallet collection exists"
+    set sc=..CheckStatus(..EnsureWalletCollection(walletCollection,"MedSim_Wallet_Use","MedSim_Wallet_Edit"),"Unable to create wallet collection")
+    if $SYSTEM.Status.IsError(sc) quit sc
+
+    write !,"[MedSim] Ensuring namespace "_ns_" exists"
     set sc=..CheckStatus(..EnsureNamespace(ns),"Unable to install foundation namespace")
     if $SYSTEM.Status.IsError(sc) quit sc
 
-    write !,"[MedSentinel] Ensuring FHIR namespace support and endpoint "_fhirPath_" exist"
+    write !,"[MedSim] Ensuring FHIR namespace support and endpoint "_fhirPath_" exist"
     set sc=..CheckStatus(..EnsureFHIREndpoint(ns,fhirPath,fhirStrategy,fhirMetadata,serverName),"Unable to install FHIR endpoint")
     if $SYSTEM.Status.IsError(sc) quit sc
 
     set fhirRoles=..NormalizeGrantedRoles(..GetFHIRRoles(ns,fhirPath))
-    write !,"[MedSentinel] Ensuring service role and application user exist"
-    set sc=..CheckStatus(..EnsureRole(serviceRole,"MedSentinel backend service role","MedSentinel_Data:RWU,MedSentinel_Wallet_Use:U,MedSentinel_Wallet_Edit:W,MedSentinel_FHIR_Use:U,MedSentinel_FHIR_Edit:W",fhirRoles),"Unable to create service role")
+    write !,"[MedSim] Ensuring service role and application user exist"
+    set sc=..CheckStatus(..EnsureRole(serviceRole,"MedSim backend service role","MedSim_Data:RWU,MedSim_Wallet_Use:U,MedSim_Wallet_Edit:W,MedSim_FHIR_Use:U,MedSim_FHIR_Edit:W",fhirRoles),"Unable to create service role")
     if $SYSTEM.Status.IsError(sc) quit sc
     set sc=..CheckStatus(..EnsureUser(appUser,appPassword,serviceRole,ns),"Unable to create application user")
     if $SYSTEM.Status.IsError(sc) quit sc
@@ -58,13 +58,13 @@ ClassMethod Main() As %Status
     set sc=..CheckStatus(..WriteBootstrapMarker(ns,fhirPath,serverName,appUser,walletCollection),"Unable to write bootstrap marker")
     if $SYSTEM.Status.IsError(sc) quit sc
 
-    write !,"[MedSentinel] Bootstrap finished successfully",!
+    write !,"[MedSim] Bootstrap finished successfully",!
     quit 1
 }
 
 ClassMethod HandleError()
 {
-    write !,"[MedSentinel] Bootstrap failed: ",$ze,!
+    write !,"[MedSim] Bootstrap failed: ",$ze,!
     quit 0
 }
 
@@ -84,7 +84,7 @@ ClassMethod NormalizePath(path As %String) As %String
 
 ClassMethod CheckStatus(sc As %Status, context As %String = "")
 {
-    if $SYSTEM.Status.IsError(sc) write !,"[MedSentinel] "_context,!
+    if $SYSTEM.Status.IsError(sc) write !,"[MedSim] "_context,!
     if $SYSTEM.Status.IsError(sc) do $system.Status.DisplayError(sc)
     quit sc
 }
@@ -101,7 +101,7 @@ ClassMethod EnsureNamespace(ns As %String) As %Status
     set originalNS=$namespace
     set $namespace="HSLIB"
     if '##class(%SYS.Namespace).Exists(ns) kill vars
-    if '##class(%SYS.Namespace).Exists(ns) set vars("Description")="MedSentinel Foundation Namespace"
+    if '##class(%SYS.Namespace).Exists(ns) set vars("Description")="MedSim Foundation Namespace"
     if '##class(%SYS.Namespace).Exists(ns) set sc=##class(HS.Util.Installer.Foundation).Install(ns,.vars)
     set $namespace=originalNS
     quit sc
@@ -114,7 +114,7 @@ ClassMethod EnsureFHIREndpoint(ns As %String, fhirPath As %String, fhirStrategy 
     set $namespace=ns
     do ##class(HS.FHIRServer.Installer).InstallNamespace()
     set appSc=1
-    if '##class(HS.FHIRServer.Installer).CSPAppExists(fhirPath,.appObj,.appSc) do ##class(HS.FHIRServer.Installer).InstallInstance(fhirPath,fhirStrategy,fhirMetadata,"","MedSentinel FHIR repository",1,"","",serverName)
+    if '##class(HS.FHIRServer.Installer).CSPAppExists(fhirPath,.appObj,.appSc) do ##class(HS.FHIRServer.Installer).InstallInstance(fhirPath,fhirStrategy,fhirMetadata,"","MedSim FHIR repository",1,"","",serverName)
     set $namespace=originalNS
     quit sc
 }
@@ -171,7 +171,7 @@ ClassMethod EnsureWalletCollection(name As %String, useResource As %String, edit
 ClassMethod EnsureUser(username As %String, password As %String, roles As %String, ns As %String) As %Status
 {
     set sc=1
-    if '##class(Security.Users).Exists(username,.userObj,.sc) set sc=##class(Security.Users).Create(username,roles,password,"MedSentinel Service Account",ns,"","",0,1,"MedSentinel bootstrap managed service user",1,"","",.attrs,1,1) quit sc
+    if '##class(Security.Users).Exists(username,.userObj,.sc) set sc=##class(Security.Users).Create(username,roles,password,"MedSim Service Account",ns,"","",0,1,"MedSim bootstrap managed service user",1,"","",.attrs,1,1) quit sc
     set roleList=roles
     set sc=##class(Security.Users).AddRoles(username,.roleList,0)
     if $SYSTEM.Status.IsError(sc) quit sc
@@ -190,12 +190,12 @@ ClassMethod WriteBootstrapMarker(ns As %String, fhirPath As %String, serverName 
     set originalNS=$namespace
     set $namespace=ns
     set stamp=$zdatetime($horolog,3)
-    set ^MedSentinel.Bootstrap("namespace")=ns
-    set ^MedSentinel.Bootstrap("fhirPath")=fhirPath
-    set ^MedSentinel.Bootstrap("serverName")=serverName
-    set ^MedSentinel.Bootstrap("appUser")=appUser
-    set ^MedSentinel.Bootstrap("walletCollection")=walletCollection
-    set ^MedSentinel.Bootstrap("lastRunUTC")=stamp
+    set ^MedSim.Bootstrap("namespace")=ns
+    set ^MedSim.Bootstrap("fhirPath")=fhirPath
+    set ^MedSim.Bootstrap("serverName")=serverName
+    set ^MedSim.Bootstrap("appUser")=appUser
+    set ^MedSim.Bootstrap("walletCollection")=walletCollection
+    set ^MedSim.Bootstrap("lastRunUTC")=stamp
     set $namespace=originalNS
     quit 1
 }

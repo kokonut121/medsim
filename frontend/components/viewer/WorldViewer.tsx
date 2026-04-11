@@ -878,7 +878,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
       </div>
 
       <div className="world-brand">
-        <span className="world-brand__logo">MedSentinel</span>
+        <span className="world-brand__logo">MedSim</span>
         <span className="world-brand__sub">LeTourneau University · Nursing Skills Lab · Live scan</span>
       </div>
 

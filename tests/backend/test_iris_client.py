@@ -35,7 +35,7 @@ def test_native_client_explains_missing_global_access():
     client = NativeIRISClient.__new__(NativeIRISClient)
     client._iris = _StubIRIS(_FailingNode())
 
-    with pytest.raises(RuntimeError, match="Re-run the MedSentinel IRIS bootstrap"):
+    with pytest.raises(RuntimeError, match="Re-run the MedSim IRIS bootstrap"):
         client._verify_native_global_access()
 
 
@@ -50,4 +50,4 @@ def test_native_client_load_json_uses_sdk_default_argument():
     client = NativeIRISClient.__new__(NativeIRISClient)
     client._iris = _StubIRIS(_JsonNode(json.dumps({"status": "ready"})))
 
-    assert client._load_json("MedSentinel.WorldModel", "model_demo") == {"status": "ready"}
+    assert client._load_json("MedSim.WorldModel", "model_demo") == {"status": "ready"}

@@ -6,7 +6,7 @@ readonly script_dir
 
 IRIS_INSTANCE="${IRIS_INSTANCE:-IRIS}"
 FHIR_CONFIG_PATH="${FHIR_CONFIG_PATH:-${script_dir}/fhir_config.json}"
-BOOTSTRAP_CLASS_PATH="${BOOTSTRAP_CLASS_PATH:-${script_dir}/MedSentinelInstaller.cls}"
+BOOTSTRAP_CLASS_PATH="${BOOTSTRAP_CLASS_PATH:-${script_dir}/MedSimInstaller.cls}"
 export BOOTSTRAP_CLASS_PATH
 
 json_default() {
@@ -36,15 +36,15 @@ json_default() {
 export MEDSENT_NAMESPACE="${MEDSENT_NAMESPACE:-${IRIS_NAMESPACE:-$(json_default namespace MEDSENT)}}"
 export MEDSENT_APP_USER="${MEDSENT_APP_USER:-${IRIS_USER:-$(json_default appUser medsent_app)}}"
 export MEDSENT_APP_PASSWORD="${MEDSENT_APP_PASSWORD:-${IRIS_PASSWORD:-changeme}}"
-export MEDSENT_SERVER_NAME="${MEDSENT_SERVER_NAME:-$(json_default serverName MedSentinelFHIR)}"
+export MEDSENT_SERVER_NAME="${MEDSENT_SERVER_NAME:-$(json_default serverName MedSimFHIR)}"
 export MEDSENT_FHIR_PATH="${MEDSENT_FHIR_PATH:-$(json_default endpointPath /fhir/r4)}"
 export MEDSENT_FHIR_VERSION="${MEDSENT_FHIR_VERSION:-$(json_default fhirVersion R4)}"
 export MEDSENT_FHIR_METADATA_PACKAGE="${MEDSENT_FHIR_METADATA_PACKAGE:-$(json_default metadataPackage hl7.fhir.r4.core@4.0.1)}"
 export MEDSENT_FHIR_STRATEGY_CLASS="${MEDSENT_FHIR_STRATEGY_CLASS:-$(json_default strategyClass HS.FHIRServer.Storage.Json.InteractionsStrategy)}"
-export MEDSENT_WALLET_COLLECTION="${MEDSENT_WALLET_COLLECTION:-$(json_default walletCollection MedSentinel)}"
-export MEDSENT_SERVICE_ROLE="${MEDSENT_SERVICE_ROLE:-MedSentinel_Service}"
+export MEDSENT_WALLET_COLLECTION="${MEDSENT_WALLET_COLLECTION:-$(json_default walletCollection MedSim)}"
+export MEDSENT_SERVICE_ROLE="${MEDSENT_SERVICE_ROLE:-MedSim_Service}"
 
-echo "Initializing InterSystems IRIS for MedSentinel"
+echo "Initializing InterSystems IRIS for MedSim"
 echo "  instance: ${IRIS_INSTANCE}"
 echo "  namespace: ${MEDSENT_NAMESPACE}"
 echo "  fhir path: ${MEDSENT_FHIR_PATH}"
@@ -70,21 +70,21 @@ done
 
 session_output="$(iris session "${IRIS_INSTANCE}" -U %SYS <<'EOF'
 set classPath=$system.Util.GetEnviron("BOOTSTRAP_CLASS_PATH")
-if classPath="" write !,"[MedSentinel] BOOTSTRAP_CLASS_PATH is not set",! halt
+if classPath="" write !,"[MedSim] BOOTSTRAP_CLASS_PATH is not set",! halt
 set sc=$SYSTEM.OBJ.Load(classPath,"ck")
-if $SYSTEM.Status.IsError(sc) write !,"[MedSentinel] Unable to load bootstrap class from ",classPath,!
+if $SYSTEM.Status.IsError(sc) write !,"[MedSim] Unable to load bootstrap class from ",classPath,!
 if $SYSTEM.Status.IsError(sc) do $SYSTEM.Status.DisplayError(sc)
 if $SYSTEM.Status.IsError(sc) halt
-do ##class(MedSentinel.Installer).Main()
+do ##class(MedSim.Installer).Main()
 halt
 EOF
 )"
 
 printf '%s\n' "${session_output}"
 
-if [[ "${session_output}" != *"[MedSentinel] Bootstrap finished successfully"* ]]; then
-  echo "MedSentinel IRIS bootstrap failed" >&2
+if [[ "${session_output}" != *"[MedSim] Bootstrap finished successfully"* ]]; then
+  echo "MedSim IRIS bootstrap failed" >&2
   exit 1
 fi
 
-echo "MedSentinel IRIS bootstrap complete"
+echo "MedSim IRIS bootstrap complete"

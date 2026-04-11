@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the full MedSentinel test suite.
+# Run the full MedSim test suite.
 # Usage:
 #   ./scripts/test.sh             # all tests
 #   ./scripts/test.sh -k agents   # filter by keyword
@@ -30,7 +30,7 @@ for i in "${!PYTEST_ARGS[@]}"; do
   fi
 done
 
-MEDSENTINEL_USE_SYNTHETIC_FALLBACKS=true \
+MEDSIM_USE_SYNTHETIC_FALLBACKS=true \
   "$VENV_PYTHON" -m pytest tests/ \
     -v \
     --tb=short \
