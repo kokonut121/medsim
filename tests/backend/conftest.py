@@ -29,6 +29,7 @@ def fresh_iris(monkeypatch):
         "backend.api.reports",
         "backend.api.models",
         "backend.api.fhir",
+        "backend.api.video",
         "backend.agents.orchestrator",
         "backend.simulation.scenario_runner",
     ):

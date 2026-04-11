@@ -7,12 +7,19 @@ from __future__ import annotations
 import asyncio
 import json
 
+import httpx
 import pytest
 
 from backend.pipeline.scene_graph import extract_scene_graph
 from backend.pipeline.classify import classify_image
 from backend.pipeline.image_acquisition import fetch_street_view, fetch_places_photos
-from backend.pipeline.world_model import generate_world_model
+from backend.pipeline.world_model import (
+    PROMPT_IMAGE_LIMIT,
+    _pick_prompt_images,
+    _response_error_detail,
+    _world_prompt_from_images,
+    generate_world_model,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -31,6 +38,22 @@ def make_classified_images(n: int = 4) -> list[dict]:
         }
         for i in range(n)
     ]
+
+
+def make_source_images(source: str, n: int) -> list[dict]:
+    images = []
+    for i in range(n):
+        image = {
+            "image_id": f"{source}_{i}",
+            "source": source,
+            "public_url": f"https://r2.example.com/{source}_{i}.jpg",
+        }
+        if source == "vr_video":
+            image["timestamp_s"] = i * 2.5
+        else:
+            image["heading"] = (i * 30) % 360
+        images.append(image)
+    return images
 
 
 # ---------------------------------------------------------------------------
@@ -144,6 +167,52 @@ def test_extract_scene_graph_handles_empty_images():
 # ---------------------------------------------------------------------------
 # World model — synthetic fallback (no World Labs key)
 # ---------------------------------------------------------------------------
+
+def test_pick_prompt_images_evenly_samples_long_vr_video():
+    images = make_source_images("vr_video", 24)
+
+    selected = _pick_prompt_images(images)
+
+    assert len(selected) == PROMPT_IMAGE_LIMIT
+    indices = [int(image["image_id"].rsplit("_", 1)[1]) for image in selected]
+    assert indices[0] == 0
+    assert indices[-1] == 23
+    assert max(indices) > PROMPT_IMAGE_LIMIT
+
+
+def test_pick_prompt_images_blends_places_and_street_view():
+    images = make_source_images("places", 10) + make_source_images("street_view", 10)
+
+    selected = _pick_prompt_images(images)
+
+    assert len(selected) == PROMPT_IMAGE_LIMIT
+    sources = {image["source"] for image in selected}
+    assert sources == {"places", "street_view"}
+    assert sum(1 for image in selected if image["source"] == "places") > sum(
+        1 for image in selected if image["source"] == "street_view"
+    )
+
+
+def test_world_prompt_respects_world_labs_reconstruct_limit():
+    images = make_source_images("vr_video", 20)
+
+    prompt = _world_prompt_from_images(images, {"units": [], "flow_annotations": {}})
+
+    assert prompt["reconstruct_images"] is True
+    assert len(prompt["multi_image_prompt"]) == PROMPT_IMAGE_LIMIT
+    assert PROMPT_IMAGE_LIMIT == 8
+
+
+def test_response_error_detail_prefers_detail_payload():
+    response = httpx.Response(
+        400,
+        json={"detail": [{"loc": ["body", "world_prompt"], "msg": "too many images"}]},
+    )
+
+    detail = _response_error_detail(response)
+
+    assert "too many images" in detail
+
 
 def test_generate_world_model_synthetic_fallback(monkeypatch):
     monkeypatch.setenv("MEDSENTINEL_USE_SYNTHETIC_FALLBACKS", "true")
