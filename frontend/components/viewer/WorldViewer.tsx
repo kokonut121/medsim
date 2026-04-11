@@ -46,8 +46,8 @@ interface AgentPathDef extends AgentDef {
 
 const TARGET_OVERLAY_FPS = 30;
 const LIVE_FINDINGS_LIMIT = 5;
-// ~2 seconds of motion at TARGET_OVERLAY_FPS — length of the dotted contrail.
-const AGENT_TRAIL_SAMPLES = 60;
+// ~5 seconds of motion at TARGET_OVERLAY_FPS — length of the dotted contrail.
+const AGENT_TRAIL_SAMPLES = 150;
 const UNIT_ID = "unit_1";
 
 // Grid → world coordinate mapping (must match backend team_utils.py)
@@ -259,32 +259,32 @@ function drawAgentTrail(
   ctx.lineJoin = "round";
 
   // Pass 1 — dark halo underlay so the contrail stays readable over bright
-  // splat regions. Solid (no dash), slightly thicker than the colored stroke.
+  // splat regions. Solid (no dash), thicker than the colored stroke.
   ctx.setLineDash([]);
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 6;
   ctx.strokeStyle = "#000000";
   for (let i = 0; i < history.length - 1; i += 1) {
     const a = history[i];
     const b = history[i + 1];
     if (!a.visible || !b.visible) continue;
     const t = i / (history.length - 1);
-    ctx.globalAlpha = (1 - t) * 0.5;
+    ctx.globalAlpha = (1 - t) * 0.75;
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
   }
 
-  // Pass 2 — dotted color stroke. globalAlpha ramps 0.75 → 0 head-to-tail.
-  ctx.setLineDash([2, 6]);
-  ctx.lineWidth = 2;
+  // Pass 2 — dotted color stroke. globalAlpha ramps 1.0 → 0 head-to-tail.
+  ctx.setLineDash([3, 7]);
+  ctx.lineWidth = 3;
   ctx.strokeStyle = color;
   for (let i = 0; i < history.length - 1; i += 1) {
     const a = history[i];
     const b = history[i + 1];
     if (!a.visible || !b.visible) continue;
     const t = i / (history.length - 1);
-    ctx.globalAlpha = (1 - t) * 0.75;
+    ctx.globalAlpha = 1 - t;
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
