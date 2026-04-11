@@ -147,11 +147,11 @@ function gridToWorld(col: number, row: number, height = 1.0): [number, number, n
 }
 
 const AGENT_ROLES = [
-  { role: "nurse", color: "#27ae60", speed: 0.55, cruiseHeight: 1.0, bobAmplitude: 0.08, bobRate: 1.2, bobPhase: 0.0 },
-  { role: "nurse", color: "#27ae60", speed: 0.48, cruiseHeight: 1.0, bobAmplitude: 0.1, bobRate: 1.0, bobPhase: 0.9 },
-  { role: "instructor", color: "#2980b9", speed: 0.65, cruiseHeight: 1.0, bobAmplitude: 0.12, bobRate: 1.3, bobPhase: 1.7 },
-  { role: "emergency_responder", color: "#c0392b", speed: 1.05, cruiseHeight: 1.0, bobAmplitude: 0.09, bobRate: 1.6, bobPhase: 2.4 },
-  { role: "supply_staff", color: "#8e44ad", speed: 0.38, cruiseHeight: 1.0, bobAmplitude: 0.06, bobRate: 0.85, bobPhase: 3.1 },
+  { role: "nurse", color: "#27ae60", speed: 0.55, cruiseHeight: 1.5, bobAmplitude: 0.08, bobRate: 1.2, bobPhase: 0.0 },
+  { role: "nurse", color: "#27ae60", speed: 0.48, cruiseHeight: 1.5, bobAmplitude: 0.1, bobRate: 1.0, bobPhase: 0.9 },
+  { role: "instructor", color: "#2980b9", speed: 0.65, cruiseHeight: 1.5, bobAmplitude: 0.12, bobRate: 1.3, bobPhase: 1.7 },
+  { role: "emergency_responder", color: "#c0392b", speed: 1.05, cruiseHeight: 1.5, bobAmplitude: 0.09, bobRate: 1.6, bobPhase: 2.4 },
+  { role: "supply_staff", color: "#8e44ad", speed: 0.38, cruiseHeight: 1.5, bobAmplitude: 0.06, bobRate: 0.85, bobPhase: 3.1 },
 ];
 
 const SEV_COLOR: Record<Severity, string> = {
