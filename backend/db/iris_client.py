@@ -1230,6 +1230,63 @@ class NativeIRISClient:
             raise KeyError(unit_id)
         return simulations[0]
 
+    # ------------------------------------------------------------------
+    # Patient intake
+    # ------------------------------------------------------------------
+
+    def write_patient_intake(self, intake: "PatientIntake") -> "PatientIntake":
+        self._store_model("MedSentinel.PatientIntake", intake.intake_id, intake)
+        from backend.reports.fhir_projector import build_patient_resource, build_condition_resource
+        try:
+            self._fhir_repository.put_resource(build_patient_resource(intake))
+            self._fhir_repository.put_resource(build_condition_resource(intake))
+        except Exception:
+            logger.exception("Failed to project intake %s into IRIS FHIR repository", intake.intake_id)
+        return intake
+
+    def get_patient_intake(self, intake_id: str) -> "PatientIntake":
+        data = self._load_json("MedSentinel.PatientIntake", intake_id)
+        if data is None:
+            raise KeyError(intake_id)
+        from backend.models import PatientIntake
+        return PatientIntake.model_validate(data)
+
+    def list_patient_intakes(self, unit_id: str) -> list["PatientIntake"]:
+        from backend.models import PatientIntake
+        intakes = [
+            intake for intake in self._load_models("MedSentinel.PatientIntake", PatientIntake).values()
+            if intake.unit_id == unit_id
+        ]
+        return sorted(intakes, key=lambda x: x.received_at, reverse=True)
+
+    def search_similar_intakes(
+        self,
+        query_embedding: list[float],
+        unit_id: str,
+        top_k: int = 5,
+    ) -> list["PatientIntake"]:
+        from backend.pipeline.patient_embedder import cosine_similarity
+        candidates = self.list_patient_intakes(unit_id)
+        scored = [
+            (cosine_similarity(query_embedding, intake.embedding), intake)
+            for intake in candidates
+            if intake.embedding
+        ]
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [intake for _, intake in scored[:top_k]]
+
+    def get_patient_fhir_resource(self, patient_id: str) -> dict[str, Any]:
+        resource = self._fhir_repository.get_resource("Patient", patient_id)
+        if resource is None:
+            raise KeyError(patient_id)
+        return resource
+
+    def get_condition_fhir_resource(self, condition_id: str) -> dict[str, Any]:
+        resource = self._fhir_repository.get_resource("Condition", condition_id)
+        if resource is None:
+            raise KeyError(condition_id)
+        return resource
+
     def get_diagnostic_report_resource(self, scan_id: str) -> dict[str, Any]:
         scan = self.scans.get(scan_id)
         if not scan:

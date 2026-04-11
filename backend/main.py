@@ -43,13 +43,6 @@ app.include_router(reports_router)
 app.include_router(websocket_router)
 
 
-@app.on_event("shutdown")
-async def _close_redis() -> None:
-    from backend.db.redis_client import redis_client
-
-    await redis_client.close()
-
-
 @app.on_event("startup")
 async def _auto_scan_on_startup() -> None:
     """Run an initial safety scan for every ready model so findings are populated immediately."""
