@@ -154,19 +154,137 @@ ScenarioAgentKind = Literal[
     "nurse",
     "doctor",
 ]
+TaskStatus = Literal["queued", "active", "blocked", "complete"]
+TaskPriority = Literal["critical", "high", "medium", "low"]
+HandoffUrgency = Literal["critical", "high", "medium", "low"]
+ChallengeSeverity = Literal["critical", "high", "medium", "low"]
+SupervisorInsightKind = Literal["shared_bottleneck", "critical_handoff", "overload", "reroute"]
+GraphNodeKind = Literal["agent", "task", "challenge", "role", "insight"]
+GraphEdgeKind = Literal["handoff", "owns", "blocked_by", "supports", "highlight"]
+
+
+class ScenarioTask(BaseModel):
+    task_id: str
+    label: str
+    room_id: str | None = None
+    status: TaskStatus = "queued"
+    priority: TaskPriority = "medium"
+
+
+class ScenarioHandoff(BaseModel):
+    target_agent_id: str | None = None
+    target_kind: ScenarioAgentKind | None = None
+    reason: str
+    room_id: str | None = None
+    urgency: HandoffUrgency = "medium"
+
+
+class ScenarioChallenge(BaseModel):
+    challenge_id: str
+    label: str
+    room_id: str | None = None
+    severity: ChallengeSeverity = "medium"
+    impact: str = ""
+    blocking: bool = False
+
+
+class SupervisorInsight(BaseModel):
+    insight_id: str
+    kind: SupervisorInsightKind
+    title: str
+    summary: str
+    room_id: str | None = None
+    source_agent_ids: list[str] = Field(default_factory=list)
+    target_agent_ids: list[str] = Field(default_factory=list)
+    emphasis: ChallengeSeverity = "medium"
+
+
+class ScenarioGraphNode(BaseModel):
+    id: str
+    kind: GraphNodeKind
+    label: str
+    role_kind: ScenarioAgentKind | None = None
+    room_id: str | None = None
+    parent_id: str | None = None
+    emphasis: str | None = None
+    detail: str = ""
+    revealed_at_step: int = 0
+
+
+class ScenarioGraphEdge(BaseModel):
+    id: str
+    source: str
+    target: str
+    kind: GraphEdgeKind
+    label: str = ""
+    urgency: str | None = None
+    revealed_at_step: int = 0
+
+
+class ScenarioGraphSnapshot(BaseModel):
+    version: int = 1
+    phase: str = "running"
+    step: int = 0
+    nodes: list[ScenarioGraphNode] = Field(default_factory=list)
+    edges: list[ScenarioGraphEdge] = Field(default_factory=list)
+    highlighted_node_ids: list[str] = Field(default_factory=list)
+    narrative: str = ""
 
 
 class ScenarioAgentTrace(BaseModel):
     agent_index: int
+    agent_id: str = ""
+    call_sign: str = ""
     kind: ScenarioAgentKind
     role_label: str
+    focus_room_id: str | None = None
     actions: list[str] = Field(default_factory=list)
     path: list[str] = Field(default_factory=list)
     bottlenecks: list[str] = Field(default_factory=list)
     resource_needs: list[str] = Field(default_factory=list)
     patient_tags: list[InjurySeverity] = Field(default_factory=list)
+    tasks: list[ScenarioTask] = Field(default_factory=list)
+    handoffs: list[ScenarioHandoff] = Field(default_factory=list)
+    challenges: list[ScenarioChallenge] = Field(default_factory=list)
     notes: str = ""
     efficiency_score: float = Field(default=5.0, ge=0.0, le=10.0)
+
+
+ScenarioAgentEventKind = Literal["focus", "task", "handoff", "challenge", "note", "done"]
+
+
+class ScenarioAgentEvent(BaseModel):
+    """One discrete decision streamed by an agent during its NDJSON run.
+
+    The ``kind`` discriminator selects which payload field is meaningful:
+    - ``focus``: focus_room_id + path + actions + bottlenecks + resource_needs + patient_tags
+    - ``task`` / ``handoff`` / ``challenge``: the matching nested object
+    - ``note``: free-text note
+    - ``done``: efficiency_score
+    """
+
+    agent_id: str
+    agent_index: int
+    agent_kind: ScenarioAgentKind
+    call_sign: str = ""
+    role_label: str = ""
+    kind: ScenarioAgentEventKind
+    seq: int = 0
+    # focus payload
+    focus_room_id: str | None = None
+    path: list[str] = Field(default_factory=list)
+    actions: list[str] = Field(default_factory=list)
+    bottlenecks: list[str] = Field(default_factory=list)
+    resource_needs: list[str] = Field(default_factory=list)
+    patient_tags: list[InjurySeverity] = Field(default_factory=list)
+    # task / handoff / challenge payloads
+    task: ScenarioTask | None = None
+    handoff: ScenarioHandoff | None = None
+    challenge: ScenarioChallenge | None = None
+    # note payload
+    note: str | None = None
+    # done payload
+    efficiency_score: float | None = None
 
 
 class ScenarioSwarmAggregate(BaseModel):
@@ -220,6 +338,11 @@ class BestPlan(BaseModel):
     assumptions: list[str] = Field(default_factory=list)
 
 
+class ScenarioReasonerResult(BaseModel):
+    best_plan: BestPlan
+    supervisor_insights: list[SupervisorInsight] = Field(default_factory=list)
+
+
 class ScenarioSimulation(BaseModel):
     simulation_id: str
     unit_id: str
@@ -230,4 +353,5 @@ class ScenarioSimulation(BaseModel):
     completed_at: datetime | None = None
     failure_reason: str | None = None
     swarm_aggregate: ScenarioSwarmAggregate | None = None
+    reasoning_graph: ScenarioGraphSnapshot | None = None
     best_plan: BestPlan | None = None

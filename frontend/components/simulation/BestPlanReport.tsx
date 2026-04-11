@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { BestPlan, InjurySeverity } from "@/types";
+import type { BestPlan, InjurySeverity, ScenarioSwarmAggregate } from "@/types";
 
 const TIER_ORDER: InjurySeverity[] = ["immediate", "delayed", "minor", "expectant"];
 const TIER_COLOR: Record<InjurySeverity, string> = {
@@ -11,6 +11,85 @@ const TIER_COLOR: Record<InjurySeverity, string> = {
   minor: "#4caf50",
   expectant: "#6b6b6b"
 };
+
+interface WarningItem {
+  title: string;
+  detail: string;
+  mitigation: string;
+  severity: "high" | "medium";
+}
+
+const WARNING_ACCENT: Record<WarningItem["severity"], string> = {
+  high: "#ff8a5b",
+  medium: "#d6b25e"
+};
+
+function toTitleCase(value: string) {
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function mitigationForBottleneck(detail: string) {
+  const lower = detail.toLowerCase();
+  if (lower.includes("corridor") || lower.includes("entry") || lower.includes("lane")) {
+    return "This choke point will slow patient movement, crowd handoffs, and make it harder for the team to keep treatment areas clear during peak arrival waves. Create a one-way flow lane, pull staging activity away from the pinch point, and post a coordinator there until traffic stabilizes.";
+  }
+  if (lower.includes("sightline") || lower.includes("visibility")) {
+    return "Limited visibility here raises the odds of missed updates, duplicated work, and delayed response when patient conditions change. Relocate command or observation staff to a clearer vantage point and add a runner or radio checkpoint to close the visibility gap.";
+  }
+  if (lower.includes("only one") || lower.includes("single-person")) {
+    return "This creates a single point of failure, so one delay or interruption can ripple outward and stall nearby care steps. Add backup coverage for this role or room and reroute noncritical work elsewhere so the primary operator can stay focused on high-priority cases.";
+  }
+  if (lower.includes("far") || lower.includes("reachable")) {
+    return "When critical supplies sit too far from the treatment zone, clinicians lose time walking, handoffs become less reliable, and throughput drops under pressure. Restage key supplies closer to the care area and dedicate a support runner so treatment staff are not pulled off patient care.";
+  }
+  return "This issue is likely to add friction to movement or coordination, which can quietly compound as more agents converge on the same area. Reduce travel and handoff friction around this zone, then assign one owner to monitor it until throughput recovers.";
+}
+
+function mitigationForResource(detail: string) {
+  const lower = detail.toLowerCase();
+  if (lower.includes("additional")) {
+    return "The current staffing or equipment level will likely be outpaced if arrivals spike, especially in the highest-acuity area. Pull overflow support into that zone first, then rebalance lower-priority coverage once the critical lane is stable.";
+  }
+  if (lower.includes("iv") || lower.includes("fluids") || lower.includes("blood")) {
+    return "A shortage or long retrieval path for this material will directly slow stabilization and can force teams to pause during the most time-sensitive interventions. Stage it at resuscitation rooms immediately and assign a runner to keep replenishment continuous.";
+  }
+  if (lower.includes("radio") || lower.includes("imaging") || lower.includes("review station")) {
+    return "Without this coordination tool, teams will rely on delayed verbal relays and situational awareness will degrade as the floor gets louder and busier. Prioritize the tool where communication is already breaking down so the team can recover faster decision-making.";
+  }
+  return "If this resource remains under-staged, response times will stretch and staff will waste movement on retrieval instead of treatment. Pre-stage it near peak demand and reserve a fallback cache so care teams are not delayed by retrieval trips.";
+}
+
+function buildWarnings(aggregate: ScenarioSwarmAggregate | null): WarningItem[] {
+  if (!aggregate) return [];
+
+  const warnings: WarningItem[] = [];
+
+  Object.entries(aggregate.bottleneck_counts)
+    .slice(0, 3)
+    .forEach(([detail, count]) => {
+      warnings.push({
+        title: count > 1 ? `Recurring flow blocker (${count} reports)` : "Flow blocker",
+        detail,
+        mitigation: mitigationForBottleneck(detail),
+        severity: count >= 2 ? "high" : "medium"
+      });
+    });
+
+  Object.entries(aggregate.resource_need_counts)
+    .slice(0, 3)
+    .forEach(([detail, count]) => {
+      warnings.push({
+        title: count > 1 ? `Resource gap (${count} requests)` : "Resource gap",
+        detail: toTitleCase(detail),
+        mitigation: mitigationForResource(detail),
+        severity: count >= 2 ? "high" : "medium"
+      });
+    });
+
+  return warnings.slice(0, 5);
+}
 
 function Section({
   title,
@@ -29,6 +108,7 @@ function Section({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
+        aria-label={title}
         style={{
           width: "100%",
           display: "flex",
@@ -44,7 +124,6 @@ function Section({
       >
         <div>
           <div className="eyebrow">{subtitle ?? "Report section"}</div>
-          <strong style={{ fontSize: 16 }}>{title}</strong>
         </div>
         <span style={{ fontSize: 18 }}>{open ? "−" : "+"}</span>
       </button>
@@ -177,6 +256,48 @@ export function BestPlanReport({ plan }: { plan: BestPlan }) {
           {plan.assumptions.join(" · ")}
         </div>
       )}
+    </div>
+  );
+}
+
+export function SimulationWarnings({ aggregate }: { aggregate: ScenarioSwarmAggregate | null }) {
+  const warnings = buildWarnings(aggregate);
+
+  if (warnings.length === 0) return null;
+
+  return (
+    <div className="panel" style={{ display: "grid", gap: 14 }}>
+      <div>
+        <div className="eyebrow">Operational warnings</div>
+        <h2 style={{ margin: "8px 0 6px" }}>Warnings</h2>
+        <p style={{ margin: 0, fontSize: 14 }}>
+          Potential hazards and flow inhibitors surfaced by the swarm, with the fastest intervention to protect throughput.
+        </p>
+      </div>
+
+      <div style={{ display: "grid", gap: 12 }}>
+        {warnings.map((warning, index) => (
+          <div
+            key={`${warning.title}-${warning.detail}-${index}`}
+            className="feed-card"
+            style={{
+              display: "grid",
+              gap: 8,
+              borderLeft: `4px solid ${WARNING_ACCENT[warning.severity]}`
+            }}
+          >
+            <div>
+              <div className="eyebrow">{warning.severity === "high" ? "High priority" : "Watch closely"}</div>
+              <div style={{ fontSize: 16 }}>{warning.title}</div>
+            </div>
+            <div style={{ fontSize: 14, color: "#111111" }}>{warning.detail}</div>
+            <div style={{ fontSize: 13, color: "#111111" }}>
+              <span style={{ color: "#555555" }}>Max-efficiency response: </span>
+              {warning.mitigation}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

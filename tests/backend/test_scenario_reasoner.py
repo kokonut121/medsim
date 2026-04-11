@@ -8,7 +8,7 @@ import asyncio
 import pytest
 
 from backend.config import get_settings
-from backend.models import BestPlan, ScenarioAgentTrace, ScenarioSwarmAggregate
+from backend.models import ScenarioAgentTrace, ScenarioReasonerResult, ScenarioSwarmAggregate
 from backend.simulation.scenario_reasoner import reason_scenario_plan
 
 
@@ -70,9 +70,10 @@ def test_reason_scenario_plan_returns_best_plan(demo_world_model):
             "burn casualties from factory fire",
         )
     )
-    assert isinstance(plan, BestPlan)
-    assert plan.staff_placement, "staff_placement must be populated"
-    assert plan.resource_allocation, "resource_allocation must be populated"
+    assert isinstance(plan, ScenarioReasonerResult)
+    assert plan.best_plan.staff_placement, "staff_placement must be populated"
+    assert plan.best_plan.resource_allocation, "resource_allocation must be populated"
+    assert plan.supervisor_insights, "supervisor insights must be populated"
 
 
 def test_reason_scenario_plan_covers_all_triage_tiers(demo_world_model):
@@ -84,7 +85,7 @@ def test_reason_scenario_plan_covers_all_triage_tiers(demo_world_model):
             "burn casualties from factory fire",
         )
     )
-    tiers = {tp.tier for tp in plan.triage_priorities}
+    tiers = {tp.tier for tp in plan.best_plan.triage_priorities}
     assert tiers == {"immediate", "delayed", "minor", "expectant"}
 
 
@@ -97,7 +98,7 @@ def test_reason_scenario_plan_has_three_timeline_phases(demo_world_model):
             "burn casualties from factory fire",
         )
     )
-    labels = [phase.phase_label for phase in plan.timeline]
+    labels = [phase.phase_label for phase in plan.best_plan.timeline]
     assert len(labels) >= 3
     # The synthetic path produces exactly these three phase labels.
     assert "T+0-5 min" in labels
@@ -132,7 +133,7 @@ def test_reason_scenario_plan_adds_burn_specialist_for_burn_scenario(demo_world_
             "mass burn casualties from factory fire",
         )
     )
-    kinds = {placement.kind for placement in plan.staff_placement}
+    kinds = {placement.kind for placement in plan.best_plan.staff_placement}
     assert "burn_specialist" in kinds
 
 
@@ -145,5 +146,5 @@ def test_reason_scenario_plan_skips_burn_specialist_for_non_burn(demo_world_mode
             "stabbing victim influx from street altercation",
         )
     )
-    kinds = {placement.kind for placement in plan.staff_placement}
+    kinds = {placement.kind for placement in plan.best_plan.staff_placement}
     assert "burn_specialist" not in kinds

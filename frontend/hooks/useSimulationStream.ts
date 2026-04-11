@@ -14,7 +14,9 @@ import type { ScenarioAgentTrace, SimulationWsEvent } from "@/types";
  */
 export function useSimulationStream(unitId: string) {
   const addTrace = useStore((state) => state.addSimulationTrace);
+  const applyAgentEvent = useStore((state) => state.applyAgentEvent);
   const appendChunk = useStore((state) => state.appendReasoningChunk);
+  const setGraph = useStore((state) => state.setReasoningGraph);
   const setStatus = useStore((state) => state.setSimulationStatus);
   const setCurrent = useStore((state) => state.setCurrentSimulation);
 
@@ -40,17 +42,24 @@ export function useSimulationStream(unitId: string) {
           addTrace(trace as ScenarioAgentTrace);
           break;
         }
+        case "agent_event":
+          applyAgentEvent(payload.event);
+          break;
+        case "graph_update":
+          setGraph(payload.snapshot);
+          break;
         case "reasoning_chunk":
           appendChunk(payload.text);
           break;
         case "complete":
           setCurrent(payload.simulation);
           setStatus(payload.simulation.status);
+          setGraph(payload.simulation.reasoning_graph);
           ws.close();
           break;
       }
     };
 
     return () => ws.close();
-  }, [addTrace, appendChunk, setCurrent, setStatus, unitId]);
+  }, [addTrace, applyAgentEvent, appendChunk, setCurrent, setGraph, setStatus, unitId]);
 }

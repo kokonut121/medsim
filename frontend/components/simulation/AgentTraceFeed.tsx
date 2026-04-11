@@ -15,13 +15,35 @@ const KIND_LABELS: Record<string, string> = {
   doctor: "Doctor"
 };
 
+function callSignPrefix(callSign: string) {
+  return callSign.split("-")[0] ?? callSign;
+}
+
 function TraceCard({ trace }: { trace: ScenarioAgentTrace }) {
   return (
     <div className="feed-card" style={{ display: "grid", gap: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-        <div>
-          <div className="eyebrow">#{trace.agent_index} · {KIND_LABELS[trace.kind] ?? trace.kind}</div>
-          <strong>{trace.role_label}</strong>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+        <div style={{ display: "grid", gap: 8, minWidth: 0 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              flexWrap: "wrap",
+              columnGap: 10,
+              rowGap: 6
+            }}
+          >
+            <div className="eyebrow" style={{ marginBottom: 0 }}>
+              Agent
+            </div>
+            <strong style={{ fontSize: 17, lineHeight: 1.05 }}>
+              {trace.call_sign || `#${trace.agent_index}`}
+            </strong>
+            <span className="muted" style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 0.08 }}>
+              {trace.focus_room_id ? trace.focus_room_id.replace(/^NL-/, "") : "unplaced"}
+            </span>
+          </div>
+          <div style={{ fontSize: 13, color: "var(--ink-soft)" }}>{trace.role_label}</div>
         </div>
         <div className="muted" style={{ fontSize: 12, textAlign: "right" }}>
           efficiency<br />
@@ -44,6 +66,18 @@ function TraceCard({ trace }: { trace: ScenarioAgentTrace }) {
         </ul>
       )}
 
+      {trace.tasks.length > 0 && (
+        <div style={{ display: "grid", gap: 6 }}>
+          <span className="muted" style={{ fontSize: 12 }}>Tasks</span>
+          {trace.tasks.slice(0, 3).map((task) => (
+            <div key={task.task_id} style={{ fontSize: 12 }}>
+              <strong>{task.label}</strong> · {task.status}
+              {task.room_id ? ` · ${task.room_id}` : ""}
+            </div>
+          ))}
+        </div>
+      )}
+
       {trace.bottlenecks.length > 0 && (
         <div style={{ fontSize: 12 }}>
           <span className="muted">Bottlenecks: </span>
@@ -55,6 +89,29 @@ function TraceCard({ trace }: { trace: ScenarioAgentTrace }) {
         <div style={{ fontSize: 12 }}>
           <span className="muted">Needs: </span>
           {trace.resource_needs.join(", ")}
+        </div>
+      )}
+
+      {trace.handoffs.length > 0 && (
+        <div style={{ fontSize: 12 }}>
+          <span className="muted">Handoffs: </span>
+          {trace.handoffs.slice(0, 2).map((handoff) => (
+            <span key={`${handoff.target_agent_id}-${handoff.reason}`} style={{ marginRight: 8 }}>
+              {(handoff.target_agent_id ?? handoff.target_kind ?? "unassigned")} · {handoff.reason}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {trace.challenges.length > 0 && (
+        <div style={{ fontSize: 12 }}>
+          <span className="muted">Challenges: </span>
+          {trace.challenges.slice(0, 2).map((challenge) => (
+            <span key={challenge.challenge_id} style={{ marginRight: 8 }}>
+              {challenge.label}
+              {challenge.blocking ? " (blocking)" : ""}
+            </span>
+          ))}
         </div>
       )}
 
@@ -90,6 +147,19 @@ function TraceCard({ trace }: { trace: ScenarioAgentTrace }) {
 export function AgentTraceFeed() {
   const traces = useStore((state) => state.simulationTraces);
   const sorted = [...traces].sort((a, b) => a.agent_index - b.agent_index);
+  const legendItems = Array.from(
+    new Map(
+      sorted
+        .filter((trace) => trace.call_sign)
+        .map((trace) => [
+          callSignPrefix(trace.call_sign),
+          {
+            code: callSignPrefix(trace.call_sign),
+            label: trace.role_label || KIND_LABELS[trace.kind] || trace.kind
+          }
+        ])
+    ).values()
+  );
 
   return (
     <div className="panel" style={{ display: "grid", gap: 14 }}>
@@ -109,6 +179,41 @@ export function AgentTraceFeed() {
           {sorted.map((trace) => (
             <TraceCard key={`${trace.kind}-${trace.agent_index}`} trace={trace} />
           ))}
+        </div>
+      )}
+      {legendItems.length > 0 && (
+        <div
+          style={{
+            display: "grid",
+            gap: 10,
+            paddingTop: 4,
+            borderTop: "1px solid rgba(11,16,15,0.10)"
+          }}
+        >
+          <div className="muted" style={{ fontSize: 12 }}>
+            Agent code legend
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {legendItems.map((item) => (
+              <div
+                key={item.code}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "7px 10px",
+                  borderRadius: 999,
+                  background: "rgba(250,244,228,0.56)",
+                  border: "1px solid rgba(11,16,15,0.08)"
+                }}
+              >
+                <strong style={{ fontSize: 12, minWidth: 26 }}>{item.code}</strong>
+                <span className="muted" style={{ fontSize: 12 }}>
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

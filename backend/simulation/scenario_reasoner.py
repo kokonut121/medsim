@@ -21,12 +21,13 @@ from openai import AsyncOpenAI
 
 from backend.config import get_settings
 from backend.models import (
-    BestPlan,
     InjurySeverity,
     ResourceAllocationItem,
     ScenarioAgentTrace,
+    ScenarioReasonerResult,
     ScenarioSwarmAggregate,
     StaffPlacement,
+    SupervisorInsight,
     TimelinePhase,
     TriagePriority,
 )
@@ -69,30 +70,37 @@ Triage mix: {triage_mix}
 --- SAMPLED PER-AGENT NOTES ---
 {sampled_notes}
 
-Produce a best plan with exactly these four sections:
+Produce a response with:
 1. staff_placement: StaffPlacement[] — who stands where, by room_id.
 2. resource_allocation: ResourceAllocationItem[] — what to stage where.
 3. triage_priorities: TriagePriority[] — MUST cover all four tiers
    (immediate, delayed, minor, expectant) with destination room_ids.
 4. timeline: TimelinePhase[] — MUST include at least T+0-5min,
    T+5-30min, T+30-60min phases.
+5. supervisor_insights: 2-6 structured graph insights that summarize
+   shared bottlenecks, critical coordination links, overload, or rerouting.
 
 Respond with JSON:
 {{
-  "staff_placement": [
-    {{"room_id": "...", "kind": "incident_commander|triage_officer|burn_specialist|trauma_surgeon|anesthesiologist|resource_allocator|scenario_patient|nurse|doctor", "count": 1, "rationale": "..."}}
-  ],
-  "resource_allocation": [
-    {{"resource": "...", "source_room_id": "..." or null, "destination_room_id": "...", "quantity": "...", "rationale": "..."}}
-  ],
-  "triage_priorities": [
-    {{"tier": "immediate|delayed|minor|expectant", "destination_room_id": "...", "routing_rule": "...", "staff_required": ["..."]}}
-  ],
-  "timeline": [
-    {{"phase_label": "T+0-5 min", "actions": ["..."], "decision_points": ["..."]}}
-  ],
-  "summary": "2-3 sentence plain-English summary",
-  "assumptions": ["key assumption 1", "..."]
+  "best_plan": {{
+    "staff_placement": [
+      {{"room_id": "...", "kind": "incident_commander|triage_officer|burn_specialist|trauma_surgeon|anesthesiologist|resource_allocator|scenario_patient|nurse|doctor", "count": 1, "rationale": "..."}}
+    ],
+    "resource_allocation": [
+      {{"resource": "...", "source_room_id": "..." or null, "destination_room_id": "...", "quantity": "...", "rationale": "..."}}
+    ],
+    "triage_priorities": [
+      {{"tier": "immediate|delayed|minor|expectant", "destination_room_id": "...", "routing_rule": "...", "staff_required": ["..."]}}
+    ],
+    "timeline": [
+      {{"phase_label": "T+0-5 min", "actions": ["..."], "decision_points": ["..."]}}
+    ],
+    "summary": "2-3 sentence plain-English summary",
+    "assumptions": ["key assumption 1", "..."]
+  }},
+  "supervisor_insights": [
+    {{"insight_id": "insight-1", "kind": "shared_bottleneck|critical_handoff|overload|reroute", "title": "...", "summary": "...", "room_id": "..." or null, "source_agent_ids": ["..."], "target_agent_ids": ["..."], "emphasis": "critical|high|medium|low"}}
+  ]
 }}
 """
 
@@ -108,10 +116,10 @@ async def reason_scenario_plan(
     scenario_prompt: str,
     *,
     on_chunk: Callable[[str], Awaitable[None]] | None = None,
-) -> BestPlan:
+) -> ScenarioReasonerResult:
     """
     Run the supervisor reasoner over the aggregated swarm trace and return a
-    validated ``BestPlan``. Streams reasoning chunks to ``on_chunk`` if given.
+    validated best-plan package. Streams reasoning chunks to ``on_chunk`` if given.
     """
     settings = get_settings()
     scenario = _sanitize_scenario_prompt(scenario_prompt)
@@ -177,13 +185,13 @@ async def reason_scenario_plan(
             )
             raw = response.choices[0].message.content or "{}"
         data = json.loads(raw)
-        return BestPlan.model_validate(data)
+        return ScenarioReasonerResult.model_validate(data)
     except Exception as exc:
         # Parse or API failure — fall back to synthetic so the user still gets
         # a rendered plan. The caller records failure_reason separately.
-        plan = await _synthetic_plan(scene_graph, aggregate, scenario, on_chunk=None)
-        plan.assumptions = [*plan.assumptions, f"fell back to synthetic plan: {exc}"]
-        return plan
+        result = await _synthetic_plan(scene_graph, aggregate, scenario, on_chunk=None)
+        result.best_plan.assumptions = [*result.best_plan.assumptions, f"fell back to synthetic plan: {exc}"]
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +235,7 @@ async def _synthetic_plan(
     scenario_prompt: str,
     *,
     on_chunk: Callable[[str], Awaitable[None]] | None,
-) -> BestPlan:
+) -> ScenarioReasonerResult:
     """
     Deterministic plan derived from the aggregate. Streams a few fake chunks
     through ``on_chunk`` so tests and the UI exercise the streaming path.
@@ -387,26 +395,34 @@ async def _synthetic_plan(
         f"for minor holding. Stage critical supplies forward during the first 5 minutes."
     )
 
-    plan = BestPlan(
-        staff_placement=staff_placement,
-        resource_allocation=resource_allocation,
-        triage_priorities=triage_priorities,
-        timeline=timeline,
-        summary=summary,
-        assumptions=[
-            "Current staffing levels can absorb a 50% surge for 60 minutes",
-            "Supply room inventory matches the seeded scene graph",
-            "No simultaneous competing incident on another floor",
-        ],
+    plan = ScenarioReasonerResult.model_validate(
+        {
+            "best_plan": {
+                "staff_placement": [item.model_dump() for item in staff_placement],
+                "resource_allocation": [item.model_dump() for item in resource_allocation],
+                "triage_priorities": [item.model_dump() for item in triage_priorities],
+                "timeline": [item.model_dump() for item in timeline],
+                "summary": summary,
+                "assumptions": [
+                    "Current staffing levels can absorb a 50% surge for 60 minutes",
+                    "Supply room inventory matches the seeded scene graph",
+                    "No simultaneous competing incident on another floor",
+                ],
+            },
+            "supervisor_insights": [
+                item.model_dump()
+                for item in _build_supervisor_insights(aggregate, corridor, resus)
+            ],
+        }
     )
 
     if on_chunk is not None:
         # Emit 4 fake streaming chunks so the UI and tests exercise streaming.
         for fragment in (
-            '{"staff_placement": [...], ',
+            '{"best_plan": {"staff_placement": [...], ',
             '"resource_allocation": [...], ',
             '"triage_priorities": [...], ',
-            '"timeline": [...], "summary": "..."}',
+            '"timeline": [...], "summary": "..."}, "supervisor_insights": [...]}',
         ):
             try:
                 await on_chunk(fragment)
@@ -415,6 +431,54 @@ async def _synthetic_plan(
             await asyncio.sleep(0)
 
     return plan
+
+
+def _build_supervisor_insights(
+    aggregate: ScenarioSwarmAggregate,
+    corridor: str,
+    resus: str,
+) -> list[SupervisorInsight]:
+    top_bottleneck = next(iter(aggregate.bottleneck_counts.keys()), f"Flow congestion around {corridor}")
+    top_resource = next(iter(aggregate.resource_need_counts.keys()), "critical supplies")
+    return [
+        SupervisorInsight(
+            insight_id="shared-bottleneck",
+            kind="shared_bottleneck",
+            title="Corridor congestion is cascading",
+            summary=top_bottleneck,
+            room_id=corridor,
+            source_agent_ids=[trace.agent_id for trace in aggregate.traces[:3] if trace.agent_id],
+            emphasis="high",
+        ),
+        SupervisorInsight(
+            insight_id="critical-handoff",
+            kind="critical_handoff",
+            title="Command-to-triage handoff is the primary control link",
+            summary="Keep command and triage synchronized so room routing reflects live capacity.",
+            room_id=resus,
+            source_agent_ids=[trace.agent_id for trace in aggregate.traces if trace.kind == "incident_commander"][:1],
+            target_agent_ids=[trace.agent_id for trace in aggregate.traces if trace.kind == "triage_officer"][:1],
+            emphasis="critical",
+        ),
+        SupervisorInsight(
+            insight_id="overload",
+            kind="overload",
+            title="Resus support is overloaded",
+            summary=f"Multiple agents are converging on resus while requesting {top_resource}.",
+            room_id=resus,
+            source_agent_ids=[trace.agent_id for trace in aggregate.traces if trace.focus_room_id == resus or resus in trace.path][:3],
+            emphasis="high",
+        ),
+        SupervisorInsight(
+            insight_id="reroute",
+            kind="reroute",
+            title="Reroute non-critical flow off the main spine",
+            summary=f"Use adjacent holding space so {corridor} stays clear for stretcher traffic.",
+            room_id=corridor,
+            source_agent_ids=[trace.agent_id for trace in aggregate.traces if trace.kind in {"incident_commander", "triage_officer"}][:2],
+            emphasis="medium",
+        ),
+    ]
 
 
 def _extract_room_ids(scene_graph: dict) -> list[str]:

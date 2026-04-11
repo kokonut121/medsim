@@ -103,7 +103,6 @@ The system has four clearly separated concerns:
 
 ## Repository Layout
 
-<<<<<<< HEAD
 ```
 trauma-reconstruction/
 ├── backend/
@@ -141,22 +140,15 @@ trauma-reconstruction/
 ├── pytest.ini
 └── .env.example
 ```
-=======
-- `backend/`: FastAPI APIs, pipeline steps, agent orchestration, and report generation.
-- `frontend/`: Next.js 15 App Router UI for dashboard, coverage, world model viewer, and reports.
-- `iris/`: Locked-down IRIS configuration, bootstrap, and FHIR setup for local and shared-dev environments.
-- `docs/`: Agent-first repository knowledge base and execution-plan structure.
->>>>>>> d4eefc8 (Attemping IRIS fixes)
 
 ---
 
-<<<<<<< HEAD
 ## Prerequisites
 
 - **Python 3.11+**
 - **Node.js 20+**
 - **Docker + Docker Compose** (required for IRIS; optional for full-stack local)
-- **InterSystems IRIS for Health** image access — pull from the [InterSystems Container Registry](https://containers.intersystems.com). Free community license available.
+- **InterSystems IRIS for Health** image access — either pull from the [InterSystems Container Registry](https://containers.intersystems.com) or use the community image path described in `./scripts/bootstrap-iris.sh`.
 - API keys for: Google Maps Platform, World Labs, Anthropic, OpenAI, Modal, Cloudflare R2, Mapbox (see [Environment Variables](#environment-variables))
 
 ---
@@ -212,6 +204,8 @@ docker compose up iris redis -d
 ```
 
 Wait ~30 seconds for IRIS to initialize. The first-run script at `iris/init.sh` creates the `MEDSENT` namespace, Secure Wallet, and FHIR endpoint.
+
+If you need the alternative bootstrap flow, run `./scripts/bootstrap-iris.sh`. Local development can use `intersystems/irishealth-community:latest-cd`; production can override `IRIS_IMAGE` and attach a properly permissioned durable data mount.
 
 ### 2. Set up the Python backend
 
@@ -405,11 +399,3 @@ redis_client.publish()  →  WebSocket → browser live findings panel
     ↓
 /api/reports  →  PDF (ReportLab) or FHIR DiagnosticReport (IRIS FHIR R4)
 ```
-=======
-1. Create a virtual environment and install `backend/requirements.txt`.
-2. Copy `.env.example` to `.env` and fill in Google, World Labs, Cloudflare R2, and Mapbox credentials.
-3. Start and bootstrap IRIS with `./scripts/bootstrap-iris.sh`. Local development defaults to the public `intersystems/irishealth-community:latest-cd` image and writes IRIS data into `/home/irisowner/irisdata` inside the container so startup works without privileged volume setup; production can override `IRIS_IMAGE` back to the locked-down registry image and attach a properly permissioned durable data mount.
-4. Install dependencies in `frontend/` and run `npm run build`.
-5. Start the backend with `./scripts/start-backend.sh`.
-6. Start the frontend with `npm run dev` inside `frontend/`.
->>>>>>> d4eefc8 (Attemping IRIS fixes)

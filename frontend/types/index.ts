@@ -99,6 +99,13 @@ export interface FacilityCreateInput {
 
 export type SimulationStatus = "queued" | "running" | "reasoning" | "complete" | "failed";
 export type InjurySeverity = "immediate" | "delayed" | "minor" | "expectant";
+export type TaskStatus = "queued" | "active" | "blocked" | "complete";
+export type TaskPriority = "critical" | "high" | "medium" | "low";
+export type HandoffUrgency = "critical" | "high" | "medium" | "low";
+export type ChallengeSeverity = "critical" | "high" | "medium" | "low";
+export type SupervisorInsightKind = "shared_bottleneck" | "critical_handoff" | "overload" | "reroute";
+export type GraphNodeKind = "agent" | "task" | "challenge" | "role" | "insight";
+export type GraphEdgeKind = "handoff" | "owns" | "blocked_by" | "supports" | "highlight";
 export type ScenarioAgentKind =
   | "incident_commander"
   | "triage_officer"
@@ -110,17 +117,124 @@ export type ScenarioAgentKind =
   | "nurse"
   | "doctor";
 
+export interface ScenarioTask {
+  task_id: string;
+  label: string;
+  room_id: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+}
+
+export interface ScenarioHandoff {
+  target_agent_id: string | null;
+  target_kind: ScenarioAgentKind | null;
+  reason: string;
+  room_id: string | null;
+  urgency: HandoffUrgency;
+}
+
+export interface ScenarioChallenge {
+  challenge_id: string;
+  label: string;
+  room_id: string | null;
+  severity: ChallengeSeverity;
+  impact: string;
+  blocking: boolean;
+}
+
+export interface SupervisorInsight {
+  insight_id: string;
+  kind: SupervisorInsightKind;
+  title: string;
+  summary: string;
+  room_id: string | null;
+  source_agent_ids: string[];
+  target_agent_ids: string[];
+  emphasis: ChallengeSeverity;
+}
+
+export interface ScenarioGraphNode {
+  id: string;
+  kind: GraphNodeKind;
+  label: string;
+  role_kind: ScenarioAgentKind | null;
+  room_id: string | null;
+  parent_id: string | null;
+  emphasis: string | null;
+  detail: string;
+  revealed_at_step: number;
+}
+
+export interface ScenarioGraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  kind: GraphEdgeKind;
+  label: string;
+  urgency: string | null;
+  revealed_at_step: number;
+}
+
+export interface ScenarioGraphSnapshot {
+  version: number;
+  phase: string;
+  step: number;
+  nodes: ScenarioGraphNode[];
+  edges: ScenarioGraphEdge[];
+  highlighted_node_ids: string[];
+  narrative: string;
+}
+
 export interface ScenarioAgentTrace {
   agent_index: number;
+  agent_id: string;
+  call_sign: string;
   kind: ScenarioAgentKind;
   role_label: string;
+  focus_room_id: string | null;
   actions: string[];
   path: string[];
   bottlenecks: string[];
   resource_needs: string[];
   patient_tags: InjurySeverity[];
+  tasks: ScenarioTask[];
+  handoffs: ScenarioHandoff[];
+  challenges: ScenarioChallenge[];
   notes: string;
   efficiency_score: number;
+}
+
+export type ScenarioAgentEventKind =
+  | "focus"
+  | "task"
+  | "handoff"
+  | "challenge"
+  | "note"
+  | "done";
+
+export interface ScenarioAgentEvent {
+  agent_id: string;
+  agent_index: number;
+  agent_kind: ScenarioAgentKind;
+  call_sign: string;
+  role_label: string;
+  kind: ScenarioAgentEventKind;
+  seq: number;
+  // focus payload
+  focus_room_id: string | null;
+  path: string[];
+  actions: string[];
+  bottlenecks: string[];
+  resource_needs: string[];
+  patient_tags: InjurySeverity[];
+  // task / handoff / challenge payloads
+  task: ScenarioTask | null;
+  handoff: ScenarioHandoff | null;
+  challenge: ScenarioChallenge | null;
+  // note payload
+  note: string | null;
+  // done payload
+  efficiency_score: number | null;
 }
 
 export interface ScenarioSwarmAggregate {
@@ -174,6 +288,11 @@ export interface BestPlan {
   assumptions: string[];
 }
 
+export interface ScenarioReasonerResult {
+  best_plan: BestPlan;
+  supervisor_insights: SupervisorInsight[];
+}
+
 export interface ScenarioSimulation {
   simulation_id: string;
   unit_id: string;
@@ -184,6 +303,7 @@ export interface ScenarioSimulation {
   completed_at: string | null;
   failure_reason: string | null;
   swarm_aggregate: ScenarioSwarmAggregate | null;
+  reasoning_graph: ScenarioGraphSnapshot | null;
   best_plan: BestPlan | null;
 }
 
@@ -201,5 +321,7 @@ export type SimulationWsEvent =
       failure_reason?: string;
     }
   | ({ type: "agent_trace"; simulation_id: string } & ScenarioAgentTrace)
+  | { type: "agent_event"; simulation_id: string; event: ScenarioAgentEvent }
+  | { type: "graph_update"; simulation_id: string; snapshot: ScenarioGraphSnapshot }
   | { type: "reasoning_chunk"; simulation_id: string; text: string }
   | { type: "complete"; simulation_id: string; simulation: ScenarioSimulation };

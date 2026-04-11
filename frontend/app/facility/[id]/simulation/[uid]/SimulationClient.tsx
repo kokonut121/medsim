@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 
+import { AgentReasoningGraph } from "@/components/simulation/AgentReasoningGraph";
 import { AgentTraceFeed } from "@/components/simulation/AgentTraceFeed";
-import { BestPlanReport } from "@/components/simulation/BestPlanReport";
-import { ReasoningStream } from "@/components/simulation/ReasoningStream";
+import { BestPlanReport, SimulationWarnings } from "@/components/simulation/BestPlanReport";
+import { deriveReasoningGraph } from "@/components/simulation/deriveReasoningGraph";
 import { ScenarioPromptForm } from "@/components/simulation/ScenarioPromptForm";
 import { useSimulationStream } from "@/hooks/useSimulationStream";
 import { api } from "@/lib/api";
@@ -69,6 +70,7 @@ export function SimulationClient({
   const status = useStore((state) => state.simulationStatus);
   const currentSimulation = useStore((state) => state.currentSimulation);
   const setStatus = useStore((state) => state.setSimulationStatus);
+  const setGraph = useStore((state) => state.setReasoningGraph);
   const setCurrent = useStore((state) => state.setCurrentSimulation);
   const resetSimulation = useStore((state) => state.resetSimulation);
   const [launching, setLaunching] = useState(false);
@@ -81,6 +83,12 @@ export function SimulationClient({
     if (initialSimulation) {
       setCurrent(initialSimulation);
       setStatus(initialSimulation.status);
+      setGraph(
+        initialSimulation.reasoning_graph ??
+          (initialSimulation.swarm_aggregate
+            ? deriveReasoningGraph(initialSimulation.swarm_aggregate.traces, initialSimulation.status)
+            : null)
+      );
       if (initialSimulation.swarm_aggregate) {
         // Populate the trace feed from the aggregate's traces so revisits show history.
         const addTrace = useStore.getState().addSimulationTrace;
@@ -89,10 +97,11 @@ export function SimulationClient({
         }
       }
     }
-  }, [initialSimulation, setCurrent, setStatus]);
+  }, [initialSimulation, setCurrent, setGraph, setStatus]);
 
   const runningOrPending = status === "queued" || status === "running" || status === "reasoning";
   const plan = currentSimulation?.best_plan ?? null;
+  const aggregate = currentSimulation?.swarm_aggregate ?? null;
 
   const handleLaunch = async (prompt: string, agentsPerRole: number) => {
     setError(null);
@@ -125,12 +134,17 @@ export function SimulationClient({
           gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
           alignItems: "start"
         }}
-      >
+        >
         <AgentTraceFeed />
-        <ReasoningStream />
+        <AgentReasoningGraph />
       </div>
 
-      {plan && <BestPlanReport plan={plan} />}
+      {plan && (
+        <>
+          <SimulationWarnings aggregate={aggregate} />
+          <BestPlanReport plan={plan} />
+        </>
+      )}
 
       <style jsx>{`
         @keyframes pulse {

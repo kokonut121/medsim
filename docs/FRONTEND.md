@@ -25,3 +25,5 @@
 - Findings should remain readable at a glance with domain, severity, room, and recommendation.
 - Coverage workflows must distinguish green covered zones from amber gaps.
 - Agent activity should remain visible during scan execution.
+- The scenario simulation page should keep the left trace feed readable while the right panel renders the canonical live reasoning graph.
+- Live simulation visuals should prefer structured graph updates over raw text streams; revisits must rehydrate from persisted graph state when available.
