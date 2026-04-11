@@ -165,21 +165,45 @@ function pickNextTarget(
 }
 
 // ---------------------------------------------------------------------------
-// Live agent state (mutable, lives inside a ref)
+// Live agent state — Catmull-Rom spline + eye-height float
 // ---------------------------------------------------------------------------
+
+const AGENT_EYE_HEIGHT = 1.65; // metres — shoulder/head height, well above floor
+const BOB_AMP = 0.06;          // gentle vertical float amplitude
+const JITTER = 0.18;           // lateral randomness added to each waypoint
+
+/** Add small random xz jitter so paths don't snap to exact room-center grid lines. */
+function jittered(center: { x: number; y: number; z: number }): THREE.Vector3 {
+  return new THREE.Vector3(
+    center.x + (Math.random() - 0.5) * 2 * JITTER,
+    AGENT_EYE_HEIGHT,
+    center.z + (Math.random() - 0.5) * 2 * JITTER,
+  );
+}
+
+/** Build a Catmull-Rom curve through a list of room IDs in the graph. */
+function buildCurve(roomIds: string[], graph: NavGraph): THREE.CatmullRomCurve3 {
+  const pts = roomIds.map((id) => jittered(graph.nodes[id]?.center ?? { x: 0, y: 1, z: 0 }));
+  // Need at least 2 pts; duplicate endpoints so the curve passes through them
+  if (pts.length === 1) pts.push(pts[0].clone());
+  return new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.5);
+}
 
 interface LiveAgent {
   spec: AgentSpec;
-  /** Sequence of room IDs to traverse */
-  path: string[];
-  /** Index into path of the room we are currently leaving */
-  segIdx: number;
-  /** 0→1 progress along the current segment */
+  curve: THREE.CatmullRomCurve3;
+  /** 0→1 progress along the current curve */
   t: number;
+  /** Approx arc-length of the curve in world units */
+  arcLength: number;
   /** World position (updated each tick) */
   pos: THREE.Vector3;
-  /** Current room ID (last fully-arrived room) */
-  currentRoom: string;
+  /** Phase offset for the bob sine wave (unique per agent) */
+  bobPhase: number;
+  /** Elapsed seconds (for bob) */
+  elapsed: number;
+  /** Room ID at destination end of current curve */
+  destRoom: string;
 }
 
 function makeAgents(graph: NavGraph): LiveAgent[] {
@@ -188,14 +212,22 @@ function makeAgents(graph: NavGraph): LiveAgent[] {
 
   return AGENT_SPECS.map((spec, i) => {
     const startId = ids[i % ids.length];
+    // Pick a random initial destination so agents start spread out
+    const destId = ids[(i + Math.floor(ids.length / 2)) % ids.length];
+    const path = bfsPath(graph, startId, destId);
+    const curve = buildCurve(path, graph);
+    const arcLength = curve.getLength() || 1;
     const node = graph.nodes[startId];
+
     return {
       spec,
-      path: [startId],
-      segIdx: 0,
+      curve,
       t: 0,
-      pos: new THREE.Vector3(node.center.x, node.center.y, node.center.z),
-      currentRoom: startId,
+      arcLength,
+      pos: new THREE.Vector3(node.center.x, AGENT_EYE_HEIGHT, node.center.z),
+      bobPhase: i * ((Math.PI * 2) / AGENT_SPECS.length), // spread bob phases
+      elapsed: 0,
+      destRoom: destId,
     };
   });
 }
@@ -206,56 +238,27 @@ function tickAgent(
   graph: NavGraph,
   criticalRoomIds: Set<string>,
 ): void {
-  if (agent.path.length < 2) {
-    // Need a new destination
-    const next = pickNextTarget(agent.spec, agent.currentRoom, graph, criticalRoomIds);
-    const newPath = bfsPath(graph, agent.currentRoom, next);
-    if (newPath.length < 2) return;
-    agent.path = newPath;
-    agent.segIdx = 0;
-    agent.t = 0;
-  }
+  agent.elapsed += dt;
 
-  const fromId = agent.path[agent.segIdx];
-  const toId = agent.path[agent.segIdx + 1];
-  if (!toId) {
-    agent.path = [];
-    return;
-  }
-
-  const fromNode = graph.nodes[fromId];
-  const toNode = graph.nodes[toId];
-  if (!fromNode || !toNode) {
-    agent.path = [];
-    return;
-  }
-
-  const fc = fromNode.center;
-  const tc = toNode.center;
-  const segDist = Math.sqrt((tc.x - fc.x) ** 2 + (tc.z - fc.z) ** 2) || 0.01;
-  const advance = (agent.spec.speed * dt) / segDist;
-
+  // Advance t proportional to speed / arc-length
+  const advance = (agent.spec.speed * dt) / agent.arcLength;
   agent.t += advance;
 
   if (agent.t >= 1) {
-    // Arrived at next waypoint
-    agent.pos.set(tc.x, tc.y, tc.z);
-    agent.currentRoom = toId;
-    agent.segIdx++;
+    // Arrived — pick a new destination and rebuild curve
+    const newDest = pickNextTarget(agent.spec, agent.destRoom, graph, criticalRoomIds);
+    const path = bfsPath(graph, agent.destRoom, newDest);
+    agent.curve = buildCurve(path, graph);
+    agent.arcLength = agent.curve.getLength() || 1;
     agent.t = 0;
-
-    if (agent.segIdx >= agent.path.length - 1) {
-      // Reached destination — clear path so a new one is chosen next tick
-      agent.path = [];
-      agent.segIdx = 0;
-    }
-  } else {
-    agent.pos.set(
-      fc.x + (tc.x - fc.x) * agent.t,
-      fc.y + (tc.y - fc.y) * agent.t,
-      fc.z + (tc.z - fc.z) * agent.t,
-    );
+    agent.destRoom = newDest;
   }
+
+  // Sample spline position
+  const pt = agent.curve.getPoint(Math.min(agent.t, 1));
+  // Add sinusoidal bob in Y so agents visibly float, not glued to floor
+  const bob = BOB_AMP * Math.sin(agent.elapsed * 1.8 + agent.bobPhase);
+  agent.pos.set(pt.x, pt.y + bob, pt.z);
 }
 
 // ---------------------------------------------------------------------------
