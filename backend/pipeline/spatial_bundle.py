@@ -12,23 +12,25 @@ from __future__ import annotations
 
 import math
 
-_GRID_SCALE = 0.8
-_COL_ORIGIN = 2.0
-_ROW_ORIGIN = 1.5
+_GRID_SCALE = 3.5
+_COL_ORIGIN = 0.86
+_ROW_ORIGIN = 0.5
 _HALF = _GRID_SCALE * 0.35
 
+# Heights for model a97601cc (ground_plane_offset=1.467, metric_scale=0.913)
+# Y = 1.467 - real_height_m / 0.913
 _EQ_HEIGHT: dict[str, float] = {
-    "hand_hygiene_dispenser": 1.2,
-    "crash_cart": 0.9,
-    "monitor": 1.8,
-    "ventilator": 1.1,
-    "iv_pole": 1.4,
-    "call_light": 0.85,
-    "workstation": 1.0,
-    "adc": 1.15,
-    "defibrillator": 1.0,
+    "hand_hygiene_dispenser": 0.15,
+    "crash_cart":             0.48,
+    "monitor":               -0.51,
+    "ventilator":             0.26,
+    "iv_pole":               -0.07,
+    "call_light":             0.54,
+    "workstation":            0.37,
+    "adc":                    0.21,
+    "defibrillator":          0.37,
 }
-_DEFAULT_HEIGHT = 1.0
+_DEFAULT_HEIGHT = 0.37
 
 
 def _grid_center(room: dict) -> dict[str, float]:

@@ -10,7 +10,7 @@ from uuid import uuid4
 from backend.config import Settings, get_settings
 from backend.db.fhir_repository import FHIRRepositoryClient
 from backend.reports.fhir_projector import build_diagnostic_report, build_observation, fhir_safe_id
-from backend.models import CoverageArea, CoverageMap, Facility, FacilityCreate, Finding, GapArea, ImageMeta, Scan, ScenarioSimulation, Unit, WorldModel
+from backend.models import CoverageArea, CoverageMap, DomainStatus, Facility, FacilityCreate, Finding, GapArea, ImageMeta, Scan, ScenarioSimulation, SpatialAnchor, Unit, WorldModel
 
 
 logger = logging.getLogger(__name__)
@@ -252,7 +252,7 @@ class MemoryIRISClient:
                 "dirty_corridors": ["NL-SUPPLY"],
             },
         }
-        from backend.pipeline.spatial_bundle import build_spatial_bundle
+        from backend.pipeline.spatial_bundle import build_spatial_bundle  # noqa: PLC0415
         spatial_bundle = build_spatial_bundle(scene_graph)
         self.models["model_unit_1"] = WorldModel(
             model_id="model_unit_1",
@@ -278,6 +278,128 @@ class MemoryIRISClient:
             ],
             updated_at=created_at,
         )
+
+        # ── Seeded scan with calibrated spatial anchors ───────────────────────
+        # Grid: SCALE=3.5, COL_ORIGIN=0.86, ROW_ORIGIN=0.5
+        # Ground plane Y=1.467; heights: dispenser=0.15, cart=0.48, iv=-0.07,
+        # workstation=0.37, call_light=0.54, adc=0.21
+        scan_id = "scan_demo_001"
+        scan_created = utcnow()  # seed as current time so it stays the "latest" scan
+        demo_scan = Scan(
+            scan_id=scan_id,
+            unit_id="unit_1",
+            model_id="model_unit_1",
+            status="complete",
+            findings=[],
+            domain_statuses={
+                d: DomainStatus(status="completed", finding_count=0,
+                                started_at=scan_created, completed_at=scan_created + timedelta(minutes=3))
+                for d in ["ICA", "ERA", "MSA", "FRA", "SCA", "PFA"]
+            },
+            triggered_at=scan_created,
+            completed_at=scan_created + timedelta(minutes=5),
+        )
+        self.scans[scan_id] = demo_scan
+
+        _findings = [
+            # ICA — Infection Control
+            Finding(
+                finding_id="f_ica_01", scan_id=scan_id, domain="ICA", sub_agent="ICA-1",
+                room_id="NL-ENTRY", severity="HIGH", compound_severity=0.78,
+                label_text="Hand hygiene dispenser empty at entry",
+                spatial_anchor=SpatialAnchor(x=0.49, y=0.15, z=-1.75),
+                confidence=0.94, evidence_r2_keys=[],
+                recommendation="Refill dispenser immediately; add secondary unit at door frame.",
+                compound_domains=["ICA"], created_at=scan_created,
+            ),
+            Finding(
+                finding_id="f_ica_02", scan_id=scan_id, domain="ICA", sub_agent="ICA-2",
+                room_id="NL-SIM3", severity="CRITICAL", compound_severity=0.91,
+                label_text="Hand hygiene dispenser missing — SIM Bay 3 entry",
+                spatial_anchor=SpatialAnchor(x=-3.01, y=0.15, z=8.75),
+                confidence=0.89, evidence_r2_keys=[],
+                recommendation="Mount standard wall dispenser at door entry per HAI protocol.",
+                compound_domains=["ICA"], created_at=scan_created,
+            ),
+            Finding(
+                finding_id="f_ica_03", scan_id=scan_id, domain="ICA", sub_agent="ICA-1",
+                room_id="NL-SKILLS-A", severity="HIGH", compound_severity=0.74,
+                label_text="Dispenser low-stock at Skills Station A",
+                spatial_anchor=SpatialAnchor(x=-3.01, y=0.15, z=-1.75),
+                confidence=0.92, evidence_r2_keys=[],
+                recommendation="Replace cartridge; schedule daily stock checks.",
+                compound_domains=["ICA"], created_at=scan_created,
+            ),
+            # ERA — Emergency Response
+            Finding(
+                finding_id="f_era_01", scan_id=scan_id, domain="ERA", sub_agent="ERA-1",
+                room_id="NL-HALL", severity="HIGH", compound_severity=0.82,
+                label_text="Crash cart access path partially obstructed",
+                spatial_anchor=SpatialAnchor(x=0.49, y=0.48, z=1.75),
+                confidence=0.88, evidence_r2_keys=[],
+                recommendation="Clear 1.5m radius around crash cart at all times per code blue protocol.",
+                compound_domains=["ERA", "PFA"], created_at=scan_created,
+            ),
+            Finding(
+                finding_id="f_era_02", scan_id=scan_id, domain="ERA", sub_agent="ERA-1",
+                room_id="NL-CONTROL", severity="ADVISORY", compound_severity=0.52,
+                label_text="AED not visible from main corridor",
+                spatial_anchor=SpatialAnchor(x=0.49, y=0.37, z=8.75),
+                confidence=0.81, evidence_r2_keys=[],
+                recommendation="Install directional AED signage in hallway; verify monthly placement.",
+                compound_domains=["ERA"], created_at=scan_created,
+            ),
+            # MSA — Medication Safety
+            Finding(
+                finding_id="f_msa_01", scan_id=scan_id, domain="MSA", sub_agent="MSA-1",
+                room_id="NL-SUPPLY", severity="CRITICAL", compound_severity=0.93,
+                label_text="ADC medication drawer left unlocked — unattended",
+                spatial_anchor=SpatialAnchor(x=0.49, y=0.21, z=5.25),
+                confidence=0.94, evidence_r2_keys=[],
+                recommendation="Lock ADC on exit; enable auto-lock after 30 s inactivity.",
+                compound_domains=["MSA"], created_at=scan_created,
+            ),
+            # FRA — Fall Risk
+            Finding(
+                finding_id="f_fra_01", scan_id=scan_id, domain="FRA", sub_agent="FRA-1",
+                room_id="NL-SIM2", severity="HIGH", compound_severity=0.76,
+                label_text="IV pole positioned at walking edge — fall hazard",
+                spatial_anchor=SpatialAnchor(x=-3.01, y=-0.07, z=5.25),
+                confidence=0.91, evidence_r2_keys=[],
+                recommendation="Reposition IV pole to bedside; secure base lock when stationary.",
+                compound_domains=["FRA"], created_at=scan_created,
+            ),
+            Finding(
+                finding_id="f_fra_02", scan_id=scan_id, domain="FRA", sub_agent="FRA-1",
+                room_id="NL-SIM3", severity="ADVISORY", compound_severity=0.55,
+                label_text="Call light not within patient reach",
+                spatial_anchor=SpatialAnchor(x=-3.01, y=0.54, z=9.0),
+                confidence=0.82, evidence_r2_keys=[],
+                recommendation="Attach call light to bed rail within arm's reach of patient.",
+                compound_domains=["FRA", "SCA"], created_at=scan_created,
+            ),
+            # SCA — Safe Communication
+            Finding(
+                finding_id="f_sca_01", scan_id=scan_id, domain="SCA", sub_agent="SCA-1",
+                room_id="NL-SIM2", severity="ADVISORY", compound_severity=0.48,
+                label_text="Patient name visible on whiteboard from corridor",
+                spatial_anchor=SpatialAnchor(x=-3.01, y=0.37, z=5.0),
+                confidence=0.85, evidence_r2_keys=[],
+                recommendation="Reposition whiteboard or install privacy screen at doorway.",
+                compound_domains=["SCA"], created_at=scan_created,
+            ),
+            # PFA — Patient Flow
+            Finding(
+                finding_id="f_pfa_01", scan_id=scan_id, domain="PFA", sub_agent="PFA-1",
+                room_id="NL-HALL-MID", severity="ADVISORY", compound_severity=0.51,
+                label_text="Corridor width reduced near SIM-2 junction",
+                spatial_anchor=SpatialAnchor(x=0.49, y=0.48, z=5.25),
+                confidence=0.79, evidence_r2_keys=[],
+                recommendation="Remove non-essential equipment from corridor to maintain 1.8m clear width.",
+                compound_domains=["PFA", "ERA"], created_at=scan_created,
+            ),
+        ]
+        self.write_findings(demo_scan, _findings)
 
     def list_facilities(self) -> list[Facility]:
         return list(self.facilities.values())
@@ -492,7 +614,14 @@ class MemoryIRISClient:
 
     def list_findings(self, unit_id: str, domain: str | None = None, severity: str | None = None, room_id: str | None = None) -> list[Finding]:
         scans = [scan for scan in self.scans.values() if scan.unit_id == unit_id]
-        findings = [finding for scan in scans for finding in scan.findings]
+        # Only use the most recent complete scan to avoid mixing stale data
+        complete_scans = sorted(
+            [s for s in scans if s.status == "complete"],
+            key=lambda s: s.triggered_at,
+            reverse=True,
+        )
+        source_scans = complete_scans[:1] if complete_scans else scans
+        findings = [finding for scan in source_scans for finding in scan.findings]
         if domain:
             findings = [finding for finding in findings if finding.domain == domain]
         if severity:
