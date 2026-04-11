@@ -58,7 +58,7 @@ function TraceCard({ trace }: { trace: ScenarioAgentTrace }) {
         </div>
       )}
 
-      {trace.actions.length > 0 && (
+      {(trace.actions?.length ?? 0) > 0 && (
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
           {trace.actions.slice(0, 4).map((action, index) => (
             <li key={index}>{action}</li>
@@ -66,7 +66,7 @@ function TraceCard({ trace }: { trace: ScenarioAgentTrace }) {
         </ul>
       )}
 
-      {trace.tasks.length > 0 && (
+      {(trace.tasks?.length ?? 0) > 0 && (
         <div style={{ display: "grid", gap: 6 }}>
           <span className="muted" style={{ fontSize: 12 }}>Tasks</span>
           {trace.tasks.slice(0, 3).map((task) => (
@@ -78,21 +78,21 @@ function TraceCard({ trace }: { trace: ScenarioAgentTrace }) {
         </div>
       )}
 
-      {trace.bottlenecks.length > 0 && (
+      {(trace.bottlenecks?.length ?? 0) > 0 && (
         <div style={{ fontSize: 12 }}>
           <span className="muted">Bottlenecks: </span>
           {trace.bottlenecks.join(", ")}
         </div>
       )}
 
-      {trace.resource_needs.length > 0 && (
+      {(trace.resource_needs?.length ?? 0) > 0 && (
         <div style={{ fontSize: 12 }}>
           <span className="muted">Needs: </span>
           {trace.resource_needs.join(", ")}
         </div>
       )}
 
-      {trace.handoffs.length > 0 && (
+      {(trace.handoffs?.length ?? 0) > 0 && (
         <div style={{ fontSize: 12 }}>
           <span className="muted">Handoffs: </span>
           {trace.handoffs.slice(0, 2).map((handoff) => (
