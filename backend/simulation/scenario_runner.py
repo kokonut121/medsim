@@ -27,6 +27,7 @@ from backend.models import (
     ScenarioSimulation,
     SupervisorInsight,
 )
+from backend.agents.swarm import _bundle_text as _bt
 from backend.pipeline.spatial_bundle import build_spatial_bundle
 from backend.simulation.scenario import run_scenario_swarm
 from backend.simulation.scenario_reasoner import reason_scenario_plan
@@ -362,7 +363,6 @@ async def run_scenario_simulation(
 
     # Augment the scenario prompt with spatial bundle summary + baseline findings
     # so every role agent reasons over the annotated facility state.
-    from backend.agents.swarm import _bundle_text as _bt
     augmented_prompt = (
         f"{scenario_prompt}\n\n"
         f"--- FACILITY SPATIAL CONTEXT ---\n{_bt(spatial_bundle)}\n\n"
