@@ -223,6 +223,7 @@ def _rule_based_fallback(scan_id: str, model, bundle: dict) -> list[dict]:
 
         def _run_sync():
             new_loop = _asyncio.new_event_loop()
+            _asyncio.set_event_loop(new_loop)
             try:
                 result_holder.append(new_loop.run_until_complete(asyncio.gather(
                     ica_team.run(scan_id, world_dict),
@@ -234,6 +235,7 @@ def _rule_based_fallback(scan_id: str, model, bundle: dict) -> list[dict]:
                 )))
             finally:
                 new_loop.close()
+                _asyncio.set_event_loop(None)
 
         t = threading.Thread(target=_run_sync)
         t.start()

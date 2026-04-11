@@ -36,6 +36,8 @@ async def get_splat(unit_id: str):
     model = iris_client.get_model(unit_id)
     if model.status != "ready":
         raise HTTPException(status_code=409, detail=f"Model is {model.status}")
+    if not settings.r2_account_id:
+        raise HTTPException(status_code=404, detail="No splat asset available")
     if not model.splat_r2_key:
         raise HTTPException(status_code=404, detail="Model asset not found")
     # Return both the public R2 URL and a CORS-safe proxy URL
@@ -60,6 +62,9 @@ async def stream_splat(unit_id: str):
         raise HTTPException(status_code=409, detail=f"Model is {model.status}")
     if not model.splat_r2_key:
         raise HTTPException(status_code=404, detail="Model asset not found")
+
+    if not settings.r2_account_id:
+        raise HTTPException(status_code=404, detail="R2 not configured — no splat asset available")
 
     s3 = boto3.client(
         "s3",

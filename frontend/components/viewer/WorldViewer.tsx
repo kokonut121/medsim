@@ -310,6 +310,62 @@ interface WorldViewerProps {
   initialSplatUrl?: string;
 }
 
+const ROOM_COLOR: Record<string, string> = {
+  patient_room: "#1a3a4a",
+  corridor_hallway: "#0d2030",
+  nursing_station: "#1a3a2a",
+  medication_room_pharmacy: "#2a2a1a",
+  lobby_main_entrance: "#1a2a3a",
+  utility_support: "#1e1e2e",
+};
+
+function FloorPlan({
+  rooms,
+  annotations,
+}: {
+  rooms: Array<{ id: string; type: string; col: number; row: number }>;
+  annotations: Array<{ id: string; room: string; severity: Severity }>;
+}) {
+  const CELL = 110;
+  const PAD = 24;
+  const cols = Math.max(...rooms.map((r) => r.col)) + 1;
+  const rows = Math.max(...rooms.map((r) => r.row)) + 1;
+  const w = cols * CELL + PAD * 2;
+  const h = rows * CELL + PAD * 2;
+  const sevByRoom: Record<string, Severity> = {};
+  for (const a of annotations) {
+    const prev = sevByRoom[a.room];
+    if (!prev || (a.severity === "CRITICAL") || (a.severity === "HIGH" && prev === "ADVISORY")) {
+      sevByRoom[a.room] = a.severity;
+    }
+  }
+  return (
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", background: "#080f14" }}
+    >
+      {rooms.map((room) => {
+        const x = PAD + room.col * CELL;
+        const y = PAD + room.row * CELL;
+        const sev = sevByRoom[room.id];
+        const fill = ROOM_COLOR[room.type] ?? "#111820";
+        const stroke = sev === "CRITICAL" ? SEV_COLOR.CRITICAL : sev === "HIGH" ? SEV_COLOR.HIGH : "#1e3040";
+        const label = room.id.replace(/^NL-/, "");
+        return (
+          <g key={room.id}>
+            <rect x={x + 3} y={y + 3} width={CELL - 6} height={CELL - 6} rx={6} fill={fill} stroke={stroke} strokeWidth={sev ? 2 : 1} />
+            <text x={x + CELL / 2} y={y + CELL / 2 - 6} textAnchor="middle" fill="#4a7a9b" fontSize={10} fontFamily="monospace">{label}</text>
+            <text x={x + CELL / 2} y={y + CELL / 2 + 10} textAnchor="middle" fill="#2a4a5a" fontSize={8} fontFamily="monospace">{room.type.replace(/_/g, " ")}</text>
+            {sev && (
+              <circle cx={x + CELL - 14} cy={y + 14} r={6} fill={SEV_COLOR[sev]} opacity={0.9} />
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const splatRef = useRef<HTMLDivElement>(null);
@@ -328,27 +384,28 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
   >([]);
   const [annotations, setAnnotations] = useState<AnnotationDef[]>([]);
   const [agentPaths, setAgentPaths] = useState<AgentPathDef[]>([]);
+  const [floorRooms, setFloorRooms] = useState<Array<{ id: string; type: string; col: number; row: number }>>([]);
 
   const isIframeUrl = splatUrl.startsWith("https://marble.worldlabs.ai");
+  const noModel = splatUrl === "";
   const { viewerRef, loading: gaussianLoading, error } = useGaussianSplatViewer(
-    isIframeUrl ? "" : splatUrl,
+    isIframeUrl || noModel ? "" : splatUrl,
     splatRef,
   );
-  const loading = !splatUrl || (!isIframeUrl && gaussianLoading);
+  const loading = !noModel && !isIframeUrl && gaussianLoading;
 
   // Load splat URL
   useEffect(() => {
     if (splatUrl) return;
     let cancelled = false;
-    const fallback = getFallbackSplatUrl(UNIT_ID);
 
     fetch(buildApiUrl(`/api/models/${UNIT_ID}/splat`), { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((payload) => {
         if (cancelled) return;
-        setSplatUrl(payload ? resolveSplatAssetUrl(payload as { signed_url: string; stream_url?: string }) : fallback);
+        setSplatUrl(payload ? resolveSplatAssetUrl(payload as { signed_url: string; stream_url?: string }) : "");
       })
-      .catch(() => { if (!cancelled) setSplatUrl(fallback); });
+      .catch(() => { if (!cancelled) setSplatUrl(""); });
 
     return () => { cancelled = true; };
   }, [splatUrl]);
@@ -408,6 +465,12 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
         if (cancelled || !sg) return;
         const rooms = (sg.rooms as Array<Record<string, unknown>>) ?? [];
         setAgentPaths(buildAgentPaths(rooms));
+        setFloorRooms(rooms.map((r) => ({
+          id: r.room_id as string,
+          type: r.type as string,
+          col: (r.grid_col as number) ?? 0,
+          row: (r.grid_row as number) ?? 0,
+        })));
       })
       .catch(() => null);
 
@@ -486,12 +549,16 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
 
     ws.onmessage = (event) => {
       try {
-        const finding = JSON.parse(event.data as string) as {
+        const msg = JSON.parse(event.data as string) as {
+          type: string;
           finding_id: string;
           label_text: string;
           severity: Severity;
         };
 
+        if (msg.type !== "finding") return;
+
+        const finding = msg;
         setLiveFindings((current) => [
           { id: finding.finding_id, text: finding.label_text, sev: finding.severity },
           ...current.filter((item) => item.id !== finding.finding_id),
@@ -522,14 +589,19 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
         <div ref={splatRef} style={{ position: "absolute", inset: 0 }} />
       )}
 
-      {loading ? (
+      {noModel && floorRooms.length > 0 ? (
+        <FloorPlan rooms={floorRooms} annotations={annotations} />
+      ) : noModel ? (
+        <div className="world-loading">
+          <div className="world-loading__ring" />
+          <p>Loading floor plan…</p>
+        </div>
+      ) : loading ? (
         <div className="world-loading">
           <div className="world-loading__ring" />
           <p>Loading world model…</p>
         </div>
-      ) : null}
-
-      {error && !loading ? (
+      ) : error ? (
         <div className="world-loading">
           <p style={{ color: SEV_COLOR.CRITICAL }}>⚠ {error}</p>
         </div>
@@ -625,7 +697,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
           {liveFindings.map((finding, index) => (
             <div
               key={finding.id}
-              className={`world-tick world-tick--${finding.sev.toLowerCase()}`}
+              className={`world-tick world-tick--${(finding.sev ?? "advisory").toLowerCase()}`}
               style={{ opacity: 1 - index * 0.18 }}
             >
               <span className="world-tick__sev">{finding.sev}</span>
