@@ -51,7 +51,7 @@ function TraceCard({ trace }: { trace: ScenarioAgentTrace }) {
         </div>
       </div>
 
-      {trace.path.length > 0 && (
+      {(trace.path?.length ?? 0) > 0 && (
         <div className="muted" style={{ fontSize: 12 }}>
           <span style={{ textTransform: "uppercase", letterSpacing: 0.5 }}>Path · </span>
           {trace.path.join(" → ")}
@@ -103,7 +103,7 @@ function TraceCard({ trace }: { trace: ScenarioAgentTrace }) {
         </div>
       )}
 
-      {trace.challenges.length > 0 && (
+      {(trace.challenges?.length ?? 0) > 0 && (
         <div style={{ fontSize: 12 }}>
           <span className="muted">Challenges: </span>
           {trace.challenges.slice(0, 2).map((challenge) => (
@@ -115,7 +115,7 @@ function TraceCard({ trace }: { trace: ScenarioAgentTrace }) {
         </div>
       )}
 
-      {trace.patient_tags.length > 0 && (
+      {(trace.patient_tags?.length ?? 0) > 0 && (
         <div style={{ display: "flex", gap: 6 }}>
           {trace.patient_tags.map((tag) => (
             <span
