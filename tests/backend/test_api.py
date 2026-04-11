@@ -96,6 +96,129 @@ def test_model_status_for_unknown_unit_returns_404(client):
     assert r.status_code == 404
 
 
+def test_video_extract_endpoint_processes_without_invalid_status(client, fresh_iris, monkeypatch):
+    monkeypatch.setattr(
+        "backend.api.video.extract_frames",
+        lambda *_args, **_kwargs: [
+            {
+                "source": "vr_video",
+                "file_name": "frame_000001.jpg",
+                "bytes": b"jpeg-bytes",
+                "content_type": "image/jpeg",
+                "heading": None,
+            }
+        ],
+    )
+
+    async def fake_classify_image(_image_bytes, _source, _context):
+        return {
+            "category": "corridor_hallway",
+            "confidence": 0.91,
+            "notes": "clear corridor",
+        }
+
+    async def fake_extract_scene_graph(_classified, _osm):
+        return {
+            "units": [{"unit_id": "unit_1", "rooms": []}],
+            "flow_annotations": {},
+        }
+
+    async def fake_generate_world_model(_images, scene_graph, *, facility_id, facility_name):
+        return {
+            "world_id": "world_test",
+            "splat_url": f"facilities/{facility_id}/models/world_test/scene.spz",
+            "scene_manifest": scene_graph,
+            "source_image_count": 1,
+            "caption": f"{facility_name} walkthrough model",
+        }
+
+    monkeypatch.setattr("backend.api.video.classify_image", fake_classify_image)
+    monkeypatch.setattr("backend.api.video.extract_scene_graph", fake_extract_scene_graph)
+    monkeypatch.setattr("backend.api.video.generate_world_model", fake_generate_world_model)
+    monkeypatch.setattr(
+        "backend.api.video._store_video_frame",
+        lambda key, payload, *, content_type: f"/api/fal-images/{key.replace('/', '_')}",
+    )
+
+    response = client.post(
+        "/api/video/extract/fac_demo?max_frames=12&equirect_crops=0",
+        files={"file": ("walkthrough.mov", b"x" * 2048, "video/quicktime")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    model = fresh_iris.models[payload["model_id"]]
+    assert model.status == "ready"
+    assert model.source_image_count == 1
+    assert model.caption == "LeTourneau University — Nursing Skills Lab walkthrough model"
+
+
+def test_process_video_offloads_blocking_frame_work(fresh_iris, monkeypatch):
+    import backend.api.video as video_api
+
+    calls: list[tuple[str, tuple[object, ...], dict[str, object]]] = []
+
+    model = fresh_iris.create_or_replace_model("fac_demo", status="queued")
+
+    def fake_extract_frames(*args, **kwargs):
+        return [
+            {
+                "source": "vr_video",
+                "file_name": "frame_000001.jpg",
+                "bytes": b"jpeg-bytes",
+                "content_type": "image/jpeg",
+                "heading": None,
+            }
+        ]
+
+    def fake_store_video_frame(*args, **kwargs):
+        return "/api/fal-images/frame_000001.jpg"
+
+    async def fake_classify_image(_image_bytes, _source, _context):
+        return {
+            "category": "corridor_hallway",
+            "confidence": 0.91,
+            "notes": "clear corridor",
+        }
+
+    async def fake_extract_scene_graph(_classified, _osm):
+        return {"units": [{"unit_id": "unit_1", "rooms": []}], "flow_annotations": {}}
+
+    async def fake_generate_world_model(_images, scene_graph, *, facility_id, facility_name):
+        return {
+            "world_id": "world_threaded",
+            "splat_url": f"facilities/{facility_id}/models/world_threaded/scene.spz",
+            "scene_manifest": scene_graph,
+            "source_image_count": 1,
+            "caption": f"{facility_name} walkthrough model",
+        }
+
+    async def fake_to_thread(func, /, *args, **kwargs):
+        calls.append((func.__name__, args, kwargs))
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr(video_api, "extract_frames", fake_extract_frames)
+    monkeypatch.setattr(video_api, "_store_video_frame", fake_store_video_frame)
+    monkeypatch.setattr(video_api, "classify_image", fake_classify_image)
+    monkeypatch.setattr(video_api, "extract_scene_graph", fake_extract_scene_graph)
+    monkeypatch.setattr(video_api, "generate_world_model", fake_generate_world_model)
+    monkeypatch.setattr(video_api.asyncio, "to_thread", fake_to_thread)
+
+    asyncio.run(
+        video_api._process_video(
+            "fac_demo",
+            model.model_id,
+            b"x" * 2048,
+            max_frames=8,
+            equirect_crops=0,
+        )
+    )
+
+    assert [name for name, _args, _kwargs in calls] == ["fake_extract_frames", "fake_store_video_frame"]
+    model = fresh_iris.models[model.model_id]
+    assert model.status == "ready"
+
+
 # ---------------------------------------------------------------------------
 # Scans
 # ---------------------------------------------------------------------------
