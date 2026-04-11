@@ -703,6 +703,59 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
     };
   }, []);
 
+  // WASD camera movement — dedicated 60fps loop, separate from the render loop
+  // so OrbitControls doesn't fight us between throttled render ticks.
+  useEffect(() => {
+    if (isIframeUrl) return;
+    let rafId: number;
+
+    const tick = () => {
+      rafId = requestAnimationFrame(tick);
+      const keys = keysRef.current;
+      if (keys.size === 0) return;
+      const viewer = viewerRef.current;
+      if (!viewer?.camera) return;
+
+      const MOVE_SPEED = 0.05; // m per frame at ~60 fps
+      const cam = viewer.camera as THREE.PerspectiveCamera;
+
+      // Forward: camera look direction projected onto horizontal (Y=const) plane.
+      const forward = new THREE.Vector3();
+      cam.getWorldDirection(forward);
+      forward.y = 0;
+      if (forward.lengthSq() < 0.0001) return;
+      forward.normalize();
+
+      // Right: standard cross-product in XZ plane.
+      // Using [0,1,0] (not cameraUp) gives correct world-space right regardless of
+      // the [0,-1,0] cameraUp setting used by the splat renderer.
+      const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0));
+      if (right.lengthSq() < 0.0001) return;
+      right.normalize();
+
+      const delta = new THREE.Vector3();
+      if (keys.has("w")) delta.addScaledVector(forward, MOVE_SPEED);
+      if (keys.has("s")) delta.addScaledVector(forward, -MOVE_SPEED);
+      if (keys.has("a")) delta.addScaledVector(right, -MOVE_SPEED);
+      if (keys.has("d")) delta.addScaledVector(right, MOVE_SPEED);
+      if (delta.lengthSq() === 0) return;
+
+      cam.position.add(delta);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const controls = (viewer as any).controls ?? (viewer as any).orbitControls;
+      if (controls?.target) {
+        // Move the orbit pivot by the same delta so the camera-to-target offset
+        // stays constant. Then call update() to sync OrbitControls' internal
+        // spherical coords — without this it arcs the camera back each frame.
+        (controls.target as THREE.Vector3).add(delta);
+        controls.update?.();
+      }
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [isIframeUrl, viewerRef]);
+
   // RAF loop
   useEffect(() => {
     if (isIframeUrl || loading || error) return;
@@ -722,31 +775,6 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
       const viewer = viewerRef.current;
       const { width, height } = shellSizeRef.current;
       if (!viewer?.camera || width === 0 || height === 0) return;
-
-      // WASD camera movement
-      const keys = keysRef.current;
-      if (keys.size > 0) {
-        const MOVE_SPEED = 0.12;
-        const cam = viewer.camera;
-        const forward = new THREE.Vector3();
-        cam.getWorldDirection(forward);
-        forward.y = 0;
-        if (forward.lengthSq() > 0.0001) forward.normalize();
-        const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
-        right.y = 0;
-        if (right.lengthSq() > 0.0001) right.normalize();
-        const delta = new THREE.Vector3();
-        if (keys.has("w")) delta.addScaledVector(forward, MOVE_SPEED);
-        if (keys.has("s")) delta.addScaledVector(forward, -MOVE_SPEED);
-        if (keys.has("a")) delta.addScaledVector(right, -MOVE_SPEED);
-        if (keys.has("d")) delta.addScaledVector(right, MOVE_SPEED);
-        if (delta.lengthSq() > 0) {
-          cam.position.add(delta);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const controls = (viewer as any).controls ?? (viewer as any).orbitControls;
-          if (controls?.target) controls.target.add(delta);
-        }
-      }
 
       const trailCtx = trailCanvasRef.current?.getContext("2d") ?? null;
       if (trailCtx) trailCtx.clearRect(0, 0, width, height);
