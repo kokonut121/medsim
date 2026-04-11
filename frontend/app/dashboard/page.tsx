@@ -1,5 +1,6 @@
 import type { Route } from "next";
 import Link from "next/link";
+import { BackLink } from "@/components/ui/BackLink";
 import { api } from "@/lib/api";
 import type { Facility } from "@/types";
 
@@ -21,6 +22,7 @@ export default async function DashboardPage() {
 
     return (
       <main className="shell">
+        <BackLink href="/" label="Return to world viewer" />
         <div className="panel">
           <div className="eyebrow">Dashboard</div>
           <h1 className="page-title">Facility intelligence network</h1>
@@ -44,6 +46,7 @@ export default async function DashboardPage() {
     const message = error instanceof Error ? error.message : "Unable to load facilities.";
     return (
       <main className="shell">
+        <BackLink href="/" label="Return to world viewer" />
         <div className="panel">
           <div className="eyebrow">Dashboard</div>
           <h1 className="page-title">Backend unavailable</h1>

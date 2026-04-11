@@ -1,3 +1,6 @@
+import type { Route } from "next";
+
+import { BackLink } from "@/components/ui/BackLink";
 import { buildApiUrl } from "@/lib/runtime";
 
 export default async function ReportPage({
@@ -9,6 +12,7 @@ export default async function ReportPage({
 
   return (
     <main className="shell">
+      <BackLink href={`/facility/${id}` as Route} label="Facility overview" />
       <div className="panel">
         <div className="eyebrow">Facility {id}</div>
         <h1 className="page-title">Report export</h1>

@@ -1,5 +1,8 @@
+import type { Route } from "next";
+
 import { ModelClient } from "./ModelClient";
 
+import { BackLink } from "@/components/ui/BackLink";
 import { api } from "@/lib/api";
 import type { Scan } from "@/types";
 
@@ -18,6 +21,7 @@ export default async function ModelPage({
 
   return (
     <main className="shell">
+      <BackLink href={`/facility/${id}` as Route} label="Facility overview" />
       <div className="panel">
         <div className="eyebrow">Facility {id}</div>
         <h1 className="page-title">World model viewer</h1>
