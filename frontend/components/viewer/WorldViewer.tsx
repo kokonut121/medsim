@@ -736,8 +736,8 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
       const delta = new THREE.Vector3();
       if (keys.has("w")) delta.addScaledVector(forward, MOVE_SPEED);
       if (keys.has("s")) delta.addScaledVector(forward, -MOVE_SPEED);
-      if (keys.has("a")) delta.addScaledVector(right, -MOVE_SPEED);
-      if (keys.has("d")) delta.addScaledVector(right, MOVE_SPEED);
+      if (keys.has("a")) delta.addScaledVector(right, MOVE_SPEED);
+      if (keys.has("d")) delta.addScaledVector(right, -MOVE_SPEED);
       if (delta.lengthSq() === 0) return;
 
       cam.position.add(delta);
