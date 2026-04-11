@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-import { AgentReasoningGraph } from "@/components/simulation/AgentReasoningGraph";
 import { AgentTraceFeed } from "@/components/simulation/AgentTraceFeed";
 import { BestPlanReport, SimulationWarnings } from "@/components/simulation/BestPlanReport";
-import { deriveReasoningGraph } from "@/components/simulation/deriveReasoningGraph";
 import { ScenarioPromptForm } from "@/components/simulation/ScenarioPromptForm";
 import { useSimulationStream } from "@/hooks/useSimulationStream";
 import { api } from "@/lib/api";
@@ -70,7 +68,6 @@ export function SimulationClient({
   const status = useStore((state) => state.simulationStatus);
   const currentSimulation = useStore((state) => state.currentSimulation);
   const setStatus = useStore((state) => state.setSimulationStatus);
-  const setGraph = useStore((state) => state.setReasoningGraph);
   const setCurrent = useStore((state) => state.setCurrentSimulation);
   const resetSimulation = useStore((state) => state.resetSimulation);
   const [launching, setLaunching] = useState(false);
@@ -78,26 +75,18 @@ export function SimulationClient({
 
   useSimulationStream(unitId);
 
-  // Seed the store from the prefetched latest simulation once on mount.
   useEffect(() => {
     if (initialSimulation) {
       setCurrent(initialSimulation);
       setStatus(initialSimulation.status);
-      setGraph(
-        initialSimulation.reasoning_graph ??
-          (initialSimulation.swarm_aggregate
-            ? deriveReasoningGraph(initialSimulation.swarm_aggregate.traces, initialSimulation.status)
-            : null)
-      );
       if (initialSimulation.swarm_aggregate) {
-        // Populate the trace feed from the aggregate's traces so revisits show history.
         const addTrace = useStore.getState().addSimulationTrace;
         for (const trace of initialSimulation.swarm_aggregate.traces) {
           addTrace(trace);
         }
       }
     }
-  }, [initialSimulation, setCurrent, setGraph, setStatus]);
+  }, [initialSimulation, setCurrent, setStatus]);
 
   const runningOrPending = status === "queued" || status === "running" || status === "reasoning";
   const plan = currentSimulation?.best_plan ?? null;
@@ -126,19 +115,7 @@ export function SimulationClient({
         </div>
       )}
       <StatusBanner status={status} failureReason={currentSimulation?.failure_reason ?? null} />
-
-      <div
-        style={{
-          display: "grid",
-          gap: 20,
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-          alignItems: "start"
-        }}
-        >
-        <AgentTraceFeed />
-        <AgentReasoningGraph />
-      </div>
-
+      <AgentTraceFeed />
       {plan && (
         <>
           <SimulationWarnings aggregate={aggregate} />
