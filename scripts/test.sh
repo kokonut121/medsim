@@ -30,7 +30,7 @@ for i in "${!PYTEST_ARGS[@]}"; do
   fi
 done
 
-MEDSIM_USE_SYNTHETIC_FALLBACKS=true \
+MEDSENTINEL_USE_SYNTHETIC_FALLBACKS=true \
   "$VENV_PYTHON" -m pytest tests/ \
     -v \
     --tb=short \

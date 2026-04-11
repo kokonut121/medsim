@@ -59,7 +59,7 @@ docker compose up iris redis -d
 # 2. Python backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
-cp .env.example .env   # fill in keys, or set MEDSIM_USE_SYNTHETIC_FALLBACKS=true
+cp .env.example .env   # fill in keys, or set MEDSENTINEL_USE_SYNTHETIC_FALLBACKS=true
 
 # 3. Start backend (uvicorn, port 8000, hot-reload)
 ./scripts/start-backend.sh
@@ -71,7 +71,7 @@ cd frontend && npm install && npm run dev   # port 3000
 pytest
 ```
 
-`MEDSIM_USE_SYNTHETIC_FALLBACKS=true` bypasses all live external API calls (World Labs, Google, Modal) and returns deterministic stub data — use this for local development without API keys.
+`MEDSENTINEL_USE_SYNTHETIC_FALLBACKS=true` bypasses all live external API calls (World Labs, Google, Modal) and returns deterministic stub data — use this for local development without API keys.
 
 ## Expected Workflow
 
@@ -111,7 +111,7 @@ All reads and writes go through adapters in `backend/db/` — never direct SDK c
 - `redis_client.py` — Redis pub/sub for real-time scan events. Channels follow `scan:<unit_id>`.
 - `r2_client.py` — Cloudflare R2 for `.spz` world model asset storage and signed-URL generation.
 
-In local dev and tests, adapters fall back to in-memory dicts when services are unreachable, controlled by `MEDSIM_USE_SYNTHETIC_FALLBACKS`.
+In local dev and tests, adapters fall back to in-memory dicts when services are unreachable, controlled by `MEDSENTINEL_USE_SYNTHETIC_FALLBACKS`.
 
 ## World Model Pipeline (`backend/pipeline/`)
 

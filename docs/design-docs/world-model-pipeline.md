@@ -17,4 +17,4 @@ For image-rich inputs such as walkthrough videos and targeted uploads, world gen
 
 Long-running walkthrough extraction work is offloaded from the FastAPI event loop so `/api/models/{unit_id}/status` remains responsive while video frames are being decoded and persisted.
 
-Synthetic behavior remains available behind `MEDSIM_USE_SYNTHETIC_FALLBACKS=true` for local or test workflows that should avoid external services.
+Synthetic behavior remains available behind `MEDSENTINEL_USE_SYNTHETIC_FALLBACKS=true` for local or test workflows that should avoid external services.

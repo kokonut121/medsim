@@ -189,9 +189,9 @@ cp .env.example .env
 | `AUTH_SECRET` | Yes | Auth.js / Clerk secret |
 | `AUTH_GOOGLE_ID` | Yes | Google OAuth client ID |
 | `AUTH_GOOGLE_SECRET` | Yes | Google OAuth client secret |
-| `MEDSIM_USE_SYNTHETIC_FALLBACKS` | No | Set `true` to run locally without live API keys |
+| `MEDSENTINEL_USE_SYNTHETIC_FALLBACKS` | No | Set `true` to run locally without live API keys |
 
-> **Synthetic fallbacks**: setting `MEDSIM_USE_SYNTHETIC_FALLBACKS=true` skips all external API calls (World Labs, Google, Modal) and returns deterministic stub data. This lets you run and develop the full stack with only Redis and IRIS running.
+> **Synthetic fallbacks**: setting `MEDSENTINEL_USE_SYNTHETIC_FALLBACKS=true` skips all external API calls (World Labs, Google, Modal) and returns deterministic stub data. This lets you run and develop the full stack with only Redis and IRIS running.
 
 ---
 
@@ -220,7 +220,7 @@ pip install -r backend/requirements.txt
 ```bash
 cp .env.example .env
 # Edit .env and fill in your API keys
-# For a no-key local run: set MEDSIM_USE_SYNTHETIC_FALLBACKS=true
+# For a no-key local run: set MEDSENTINEL_USE_SYNTHETIC_FALLBACKS=true
 ```
 
 ### 4. Start the backend
@@ -288,7 +288,7 @@ docker compose down
    docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
    ```
 
-   The `docker-compose.prod.yml` sets `MEDSIM_ENV=production`, removes IRIS public port bindings, and adds `restart: unless-stopped`.
+   The `docker-compose.prod.yml` sets `MEDSENTINEL_ENV=production`, removes IRIS public port bindings, and adds `restart: unless-stopped`.
 
 3. **Verify IRIS initialization**
 

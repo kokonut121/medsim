@@ -215,7 +215,7 @@ def test_response_error_detail_prefers_detail_payload():
 
 
 def test_generate_world_model_synthetic_fallback(monkeypatch):
-    monkeypatch.setenv("MEDSIM_USE_SYNTHETIC_FALLBACKS", "true")
+    monkeypatch.setenv("MEDSENTINEL_USE_SYNTHETIC_FALLBACKS", "true")
     # Reset cached settings so env var takes effect
     from backend.config import get_settings
     get_settings.cache_clear()
@@ -238,7 +238,7 @@ def test_generate_world_model_synthetic_fallback(monkeypatch):
 
 
 def test_generate_world_model_synthetic_is_deterministic(monkeypatch):
-    monkeypatch.setenv("MEDSIM_USE_SYNTHETIC_FALLBACKS", "true")
+    monkeypatch.setenv("MEDSENTINEL_USE_SYNTHETIC_FALLBACKS", "true")
     from backend.config import get_settings
     get_settings.cache_clear()
 
