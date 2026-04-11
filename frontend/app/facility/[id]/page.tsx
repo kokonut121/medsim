@@ -54,7 +54,7 @@ export default async function FacilityDetailPage({ params }: { params: Promise<{
   const data = await api.getFacility(id);
 
   return (
-    <main className="shell shell-dark">
+    <main className="shell">
       <BackLink href="/dashboard" label="Hub" />
       <div className="panel">
         <div className="eyebrow">{data.facility.address}</div>

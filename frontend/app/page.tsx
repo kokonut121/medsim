@@ -32,41 +32,45 @@ const STEPS = [
 
 export default function LandingPage() {
   return (
-    <div style={{ background: "var(--midnight)", minHeight: "100vh", color: "var(--bone)" }}>
+    <div style={{ background: "var(--paper)", minHeight: "100vh", color: "var(--ink)" }}>
 
       {/* ── Nav ─────────────────────────────────────── */}
       <nav style={{
         position: "sticky", top: 0, zIndex: 100,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 40px", height: 60,
-        background: "rgba(6,10,9,0.85)",
+        background: "rgba(241,235,221,0.92)",
         backdropFilter: "blur(12px)",
-        borderBottom: "1px solid var(--bone-chalk)",
+        borderBottom: "1px solid var(--chalk-hard)",
       }}>
-        <div style={{ fontFamily: "var(--font-display-stack)", fontSize: 20, fontWeight: 700, letterSpacing: "-0.03em" }}>
-          Med<span style={{ color: "var(--phosphor)" }}>Sentinel</span>
+        <div style={{ fontFamily: "var(--font-display-stack)", fontSize: 20, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--ink)" }}>
+          Med<span style={{ color: "var(--signal)" }}>Sentinel</span>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <Link href="/login" style={{
             padding: "7px 18px",
-            border: "1px solid var(--bone-chalk)",
-            borderRadius: 6,
-            color: "var(--bone-soft)",
+            border: "1px solid var(--chalk-hard)",
+            borderRadius: 2,
+            color: "var(--mercury)",
             textDecoration: "none",
-            fontSize: 13,
-            fontFamily: "var(--font-body-stack)",
+            fontSize: 12,
+            fontFamily: "var(--font-mono-stack)",
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
           }}>
             Sign in
           </Link>
           <Link href="/signup" style={{
             padding: "7px 18px",
-            background: "var(--phosphor)",
-            borderRadius: 6,
-            color: "#fff",
+            background: "var(--ink)",
+            borderRadius: 2,
+            color: "var(--paper-hi)",
             textDecoration: "none",
-            fontSize: 13,
+            fontSize: 12,
+            fontFamily: "var(--font-mono-stack)",
             fontWeight: 600,
-            fontFamily: "var(--font-body-stack)",
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
           }}>
             Request access
           </Link>
@@ -79,39 +83,42 @@ export default function LandingPage() {
         textAlign: "center",
         padding: "100px 24px 80px",
         maxWidth: 760, margin: "0 auto",
+        borderBottom: "1px solid var(--chalk-hard)",
       }}>
         <div style={{
           display: "inline-block", marginBottom: 24,
           padding: "4px 14px",
-          borderRadius: 20,
-          border: "1px solid var(--phosphor)",
-          color: "var(--phosphor)",
-          fontSize: 11,
+          border: "1px solid var(--chalk-hard)",
+          color: "var(--mercury)",
+          fontSize: 10,
           fontFamily: "var(--font-mono-stack)",
-          letterSpacing: "0.14em",
+          letterSpacing: "0.22em",
+          textTransform: "uppercase",
         }}>
-          TRAUMA CENTER INTELLIGENCE
+          Trauma Center Intelligence
         </div>
 
         <h1 style={{
           margin: "0 0 24px",
           fontFamily: "var(--font-display-stack)",
-          fontSize: "clamp(40px, 7vw, 68px)",
-          fontWeight: 700,
-          lineHeight: 1.08,
+          fontSize: "clamp(40px, 7vw, 72px)",
+          fontWeight: 300,
+          lineHeight: 0.92,
           letterSpacing: "-0.04em",
-          color: "var(--bone)",
+          color: "var(--ink)",
+          fontVariationSettings: '"opsz" 144',
         }}>
           Your facility,<br />
-          <span style={{ color: "var(--phosphor)" }}>seen clearly.</span>
+          <em style={{ fontStyle: "italic", color: "var(--signal)" }}>seen clearly.</em>
         </h1>
 
         <p style={{
           margin: "0 0 40px",
-          fontSize: "clamp(15px, 2.5vw, 18px)",
-          lineHeight: 1.65,
-          color: "var(--bone-soft)",
-          maxWidth: 560,
+          fontSize: "clamp(15px, 2vw, 17px)",
+          lineHeight: 1.7,
+          color: "var(--mercury)",
+          maxWidth: 520,
+          fontFamily: "var(--font-body-stack)",
         }}>
           MedSentinel reconstructs your trauma center in 3D, deploys AI safety agent teams
           across the model, and surfaces critical findings before they become incidents.
@@ -119,54 +126,54 @@ export default function LandingPage() {
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
           <Link href="/signup" style={{
-            padding: "14px 32px",
-            background: "var(--phosphor)",
-            color: "#fff",
-            borderRadius: 7,
+            padding: "14px 28px 14px 32px",
+            background: "var(--ink)",
+            color: "var(--paper-hi)",
+            borderRadius: 2,
             textDecoration: "none",
-            fontSize: 15,
+            fontSize: 11,
             fontWeight: 600,
-            fontFamily: "var(--font-body-stack)",
+            fontFamily: "var(--font-mono-stack)",
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
           }}>
             Get started →
           </Link>
           <Link href="/viewer" style={{
-            padding: "14px 32px",
-            border: "1px solid var(--bone-chalk)",
-            color: "var(--bone-soft)",
-            borderRadius: 7,
+            padding: "14px 28px 14px 32px",
+            border: "1px solid var(--chalk-hard)",
+            color: "var(--mercury)",
+            borderRadius: 2,
             textDecoration: "none",
-            fontSize: 15,
-            fontFamily: "var(--font-body-stack)",
+            fontSize: 11,
+            fontFamily: "var(--font-mono-stack)",
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
           }}>
-            See live demo
+            Live demo →
           </Link>
         </div>
       </section>
 
       {/* ── Features ────────────────────────────────── */}
-      <section style={{ padding: "80px 24px", maxWidth: 1040, margin: "0 auto" }}>
-        <div style={{ textAlign: "center", marginBottom: 56 }}>
-          <p style={{ fontFamily: "var(--font-mono-stack)", fontSize: 11, letterSpacing: "0.16em", color: "var(--phosphor)", marginBottom: 12 }}>
-            CAPABILITIES
-          </p>
-          <h2 style={{ fontFamily: "var(--font-display-stack)", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 700, letterSpacing: "-0.03em", margin: 0 }}>
-            Everything your safety team needs
-          </h2>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20 }}>
+      <section style={{ padding: "80px 24px", maxWidth: 1040, margin: "0 auto", borderBottom: "1px solid var(--chalk-hard)" }}>
+        <p style={{ fontFamily: "var(--font-mono-stack)", fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--mercury)", marginBottom: 48, textAlign: "center" }}>
+          Capabilities
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 24 }}>
           {FEATURES.map((f) => (
             <div key={f.title} style={{
               padding: "28px 24px",
-              background: "var(--midnight-card)",
-              border: "1px solid var(--bone-chalk)",
-              borderRadius: 10,
+              background: "var(--paper-hi)",
+              border: "1px solid var(--chalk-hard)",
+              borderRadius: 2,
+              boxShadow: "5px 5px 0 var(--ink)",
             }}>
-              <div style={{ fontSize: 22, marginBottom: 14, color: "var(--phosphor)" }}>{f.icon}</div>
-              <h3 style={{ margin: "0 0 10px", fontFamily: "var(--font-display-stack)", fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em" }}>
+              <div style={{ fontSize: 20, marginBottom: 14, color: "var(--signal)" }}>{f.icon}</div>
+              <h3 style={{ margin: "0 0 10px", fontFamily: "var(--font-display-stack)", fontSize: 18, fontWeight: 400, color: "var(--ink)" }}>
                 {f.title}
               </h3>
-              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--bone-soft)" }}>
+              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.65, color: "var(--mercury)", fontFamily: "var(--font-body-stack)" }}>
                 {f.body}
               </p>
             </div>
@@ -175,78 +182,51 @@ export default function LandingPage() {
       </section>
 
       {/* ── How it works ────────────────────────────── */}
-      <section style={{
-        padding: "80px 24px",
-        maxWidth: 800, margin: "0 auto",
-        borderTop: "1px solid var(--bone-chalk)",
-      }}>
-        <div style={{ textAlign: "center", marginBottom: 56 }}>
-          <p style={{ fontFamily: "var(--font-mono-stack)", fontSize: 11, letterSpacing: "0.16em", color: "var(--phosphor)", marginBottom: 12 }}>
-            HOW IT WORKS
-          </p>
-          <h2 style={{ fontFamily: "var(--font-display-stack)", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 700, letterSpacing: "-0.03em", margin: 0 }}>
-            From footage to findings in four steps
-          </h2>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-          {STEPS.map((s, i) => (
-            <div key={s.n} style={{
-              display: "grid",
-              gridTemplateColumns: "56px 1fr",
-              gap: "0 24px",
-              padding: "28px 0",
-              borderBottom: i < STEPS.length - 1 ? "1px solid var(--bone-chalk)" : "none",
-            }}>
-              <div style={{
-                fontFamily: "var(--font-mono-stack)",
-                fontSize: 13,
-                fontWeight: 700,
-                color: "var(--phosphor)",
-                paddingTop: 3,
-              }}>
-                {s.n}
-              </div>
-              <div>
-                <h3 style={{ margin: "0 0 6px", fontFamily: "var(--font-display-stack)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em" }}>
-                  {s.title}
-                </h3>
-                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.65, color: "var(--bone-soft)" }}>
-                  {s.body}
-                </p>
-              </div>
+      <section style={{ padding: "80px 24px", maxWidth: 760, margin: "0 auto", borderBottom: "1px solid var(--chalk-hard)" }}>
+        <p style={{ fontFamily: "var(--font-mono-stack)", fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--mercury)", marginBottom: 48, textAlign: "center" }}>
+          How it works
+        </p>
+        {STEPS.map((s, i) => (
+          <div key={s.n} style={{
+            display: "grid", gridTemplateColumns: "56px 1fr", gap: "0 24px",
+            padding: "28px 0",
+            borderBottom: i < STEPS.length - 1 ? "1px solid var(--chalk)" : "none",
+          }}>
+            <div style={{ fontFamily: "var(--font-mono-stack)", fontSize: 12, fontWeight: 700, color: "var(--signal)", paddingTop: 3 }}>
+              {s.n}
             </div>
-          ))}
-        </div>
+            <div>
+              <h3 style={{ margin: "0 0 6px", fontFamily: "var(--font-display-stack)", fontSize: 20, fontWeight: 400, color: "var(--ink)" }}>
+                {s.title}
+              </h3>
+              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.65, color: "var(--mercury)", fontFamily: "var(--font-body-stack)" }}>
+                {s.body}
+              </p>
+            </div>
+          </div>
+        ))}
       </section>
 
       {/* ── CTA ─────────────────────────────────────── */}
-      <section style={{
-        padding: "80px 24px 100px",
-        textAlign: "center",
-        borderTop: "1px solid var(--bone-chalk)",
-      }}>
-        <h2 style={{
-          fontFamily: "var(--font-display-stack)",
-          fontSize: "clamp(28px, 4vw, 44px)",
-          fontWeight: 700,
-          letterSpacing: "-0.04em",
-          margin: "0 0 16px",
-        }}>
+      <section style={{ padding: "80px 24px 100px", textAlign: "center", maxWidth: 600, margin: "0 auto" }}>
+        <h2 style={{ fontFamily: "var(--font-display-stack)", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 300, letterSpacing: "-0.04em", margin: "0 0 16px", color: "var(--ink)" }}>
           Ready to deploy MedSentinel?
         </h2>
-        <p style={{ fontSize: 16, color: "var(--bone-soft)", margin: "0 0 36px" }}>
+        <p style={{ fontSize: 15, color: "var(--mercury)", margin: "0 0 36px", fontFamily: "var(--font-body-stack)" }}>
           Join trauma centers using AI to stay ahead of safety incidents.
         </p>
         <Link href="/signup" style={{
           display: "inline-block",
-          padding: "14px 40px",
-          background: "var(--phosphor)",
-          color: "#fff",
-          borderRadius: 7,
+          padding: "14px 36px",
+          background: "var(--ink)",
+          color: "var(--paper-hi)",
+          borderRadius: 2,
           textDecoration: "none",
-          fontSize: 15,
+          fontSize: 11,
           fontWeight: 600,
-          fontFamily: "var(--font-body-stack)",
+          fontFamily: "var(--font-mono-stack)",
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
         }}>
           Request access →
         </Link>
@@ -254,22 +234,17 @@ export default function LandingPage() {
 
       {/* ── Footer ──────────────────────────────────── */}
       <footer style={{
-        borderTop: "1px solid var(--bone-chalk)",
+        borderTop: "1px solid var(--chalk-hard)",
         padding: "24px 40px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: 12,
+        display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12,
       }}>
-        <div style={{ fontFamily: "var(--font-display-stack)", fontSize: 16, fontWeight: 700, letterSpacing: "-0.03em" }}>
-          Med<span style={{ color: "var(--phosphor)" }}>Sentinel</span>
+        <div style={{ fontFamily: "var(--font-display-stack)", fontSize: 16, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--ink)" }}>
+          Med<span style={{ color: "var(--signal)" }}>Sentinel</span>
         </div>
-        <p style={{ margin: 0, fontSize: 12, color: "var(--bone-soft)", fontFamily: "var(--font-mono-stack)" }}>
-          © 2025 MedSentinel. Trauma center intelligence.
+        <p style={{ margin: 0, fontSize: 11, color: "var(--mercury)", fontFamily: "var(--font-mono-stack)", letterSpacing: "0.1em" }}>
+          © 2025 MEDSENTINEL · TRAUMA CENTER INTELLIGENCE
         </p>
       </footer>
-
     </div>
   );
 }

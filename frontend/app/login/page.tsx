@@ -23,149 +23,94 @@ export default function LoginPage() {
     setTimeout(() => router.push("/dashboard"), 600);
   }
 
+  const inputStyle: React.CSSProperties = {
+    background: "var(--paper-hi)",
+    border: "1px solid var(--chalk-hard)",
+    borderRadius: 2,
+    padding: "10px 14px",
+    color: "var(--ink)",
+    fontSize: 14,
+    fontFamily: "var(--font-body-stack)",
+    outline: "none",
+    width: "100%",
+    boxSizing: "border-box",
+  };
+
   return (
-    <main style={{
-      minHeight: "100vh",
-      background: "var(--midnight)",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "24px",
-    }}>
-      {/* logo */}
+    <div style={{ background: "var(--paper)", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+
       <Link href="/" style={{ textDecoration: "none", marginBottom: 40 }}>
-        <div style={{
-          fontFamily: "var(--font-display-stack)",
-          fontSize: 22,
-          fontWeight: 700,
-          color: "var(--bone)",
-          letterSpacing: "-0.03em",
-        }}>
-          Med<span style={{ color: "var(--phosphor)" }}>Sentinel</span>
+        <div style={{ fontFamily: "var(--font-display-stack)", fontSize: 22, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.03em" }}>
+          Med<span style={{ color: "var(--signal)" }}>Sentinel</span>
         </div>
       </Link>
 
       <div style={{
-        width: "100%",
-        maxWidth: 400,
-        background: "var(--midnight-card)",
-        border: "1px solid var(--bone-chalk)",
-        borderRadius: 10,
+        width: "100%", maxWidth: 400,
+        background: "var(--paper-hi)",
+        border: "1px solid var(--chalk-hard)",
+        borderRadius: 2,
         padding: "36px 32px",
+        boxShadow: "5px 5px 0 var(--ink)",
       }}>
-        <h1 style={{
-          margin: "0 0 6px",
-          fontFamily: "var(--font-display-stack)",
-          fontSize: 24,
-          fontWeight: 700,
-          color: "var(--bone)",
-          letterSpacing: "-0.03em",
-        }}>
+        <div style={{ fontFamily: "var(--font-mono-stack)", fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--mercury)", marginBottom: 16 }}>
           Sign in
+        </div>
+        <h1 style={{ margin: "0 0 6px", fontFamily: "var(--font-display-stack)", fontSize: 28, fontWeight: 300, color: "var(--ink)", letterSpacing: "-0.03em" }}>
+          Welcome back.
         </h1>
-        <p style={{ margin: "0 0 28px", color: "var(--bone-soft)", fontSize: 14 }}>
+        <p style={{ margin: "0 0 28px", color: "var(--mercury)", fontSize: 13, fontFamily: "var(--font-body-stack)" }}>
           Access your facility intelligence dashboard.
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 12, fontFamily: "var(--font-mono-stack)", color: "var(--bone-soft)", letterSpacing: "0.08em" }}>
-              EMAIL
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@hospital.org"
-              required
-              style={{
-                background: "var(--midnight-elev)",
-                border: "1px solid var(--bone-chalk)",
-                borderRadius: 6,
-                padding: "10px 14px",
-                color: "var(--bone)",
-                fontSize: 14,
-                fontFamily: "var(--font-body-stack)",
-                outline: "none",
-              }}
-            />
+            <label style={{ fontSize: 10, fontFamily: "var(--font-mono-stack)", color: "var(--mercury)", letterSpacing: "0.16em", textTransform: "uppercase" }}>Email</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@hospital.org" required style={inputStyle} />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 12, fontFamily: "var(--font-mono-stack)", color: "var(--bone-soft)", letterSpacing: "0.08em" }}>
-              PASSWORD
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              style={{
-                background: "var(--midnight-elev)",
-                border: "1px solid var(--bone-chalk)",
-                borderRadius: 6,
-                padding: "10px 14px",
-                color: "var(--bone)",
-                fontSize: 14,
-                fontFamily: "var(--font-body-stack)",
-                outline: "none",
-              }}
-            />
+            <label style={{ fontSize: 10, fontFamily: "var(--font-mono-stack)", color: "var(--mercury)", letterSpacing: "0.16em", textTransform: "uppercase" }}>Password</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required style={inputStyle} />
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              marginTop: 8,
-              padding: "12px",
-              background: "var(--phosphor)",
-              color: "#fff",
-              border: "none",
-              borderRadius: 6,
-              fontSize: 14,
-              fontWeight: 600,
-              fontFamily: "var(--font-body-stack)",
-              cursor: loading ? "not-allowed" : "pointer",
-              opacity: loading ? 0.7 : 1,
-            }}
-          >
-            {loading ? "Signing in…" : "Sign in"}
+          <button type="submit" disabled={loading} style={{
+            marginTop: 8, padding: "12px",
+            background: "var(--ink)", color: "var(--paper-hi)",
+            border: "none", borderRadius: 2,
+            fontSize: 11, fontWeight: 600,
+            fontFamily: "var(--font-mono-stack)",
+            letterSpacing: "0.12em", textTransform: "uppercase",
+            cursor: loading ? "not-allowed" : "pointer",
+            opacity: loading ? 0.6 : 1,
+          }}>
+            {loading ? "Signing in…" : "Sign in →"}
           </button>
         </form>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0" }}>
-          <div style={{ flex: 1, height: 1, background: "var(--bone-chalk)" }} />
-          <span style={{ fontSize: 12, color: "var(--bone-soft)", fontFamily: "var(--font-mono-stack)" }}>or</span>
-          <div style={{ flex: 1, height: 1, background: "var(--bone-chalk)" }} />
+          <div style={{ flex: 1, height: 1, background: "var(--chalk-hard)" }} />
+          <span style={{ fontSize: 11, color: "var(--mercury)", fontFamily: "var(--font-mono-stack)", letterSpacing: "0.1em" }}>or</span>
+          <div style={{ flex: 1, height: 1, background: "var(--chalk-hard)" }} />
         </div>
 
-        <button
-          onClick={handleDemo}
-          disabled={loading}
-          style={{
-            width: "100%",
-            padding: "11px",
-            background: "transparent",
-            color: "var(--bone-soft)",
-            border: "1px solid var(--bone-chalk)",
-            borderRadius: 6,
-            fontSize: 14,
-            fontFamily: "var(--font-body-stack)",
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
-        >
-          Continue with demo account
+        <button onClick={handleDemo} disabled={loading} style={{
+          width: "100%", padding: "11px",
+          background: "transparent", color: "var(--mercury)",
+          border: "1px solid var(--chalk-hard)", borderRadius: 2,
+          fontSize: 11, fontFamily: "var(--font-mono-stack)",
+          letterSpacing: "0.1em", textTransform: "uppercase",
+          cursor: loading ? "not-allowed" : "pointer",
+        }}>
+          Demo account →
         </button>
 
-        <p style={{ marginTop: 24, textAlign: "center", fontSize: 13, color: "var(--bone-soft)" }}>
+        <p style={{ marginTop: 24, textAlign: "center", fontSize: 13, color: "var(--mercury)", fontFamily: "var(--font-body-stack)" }}>
           No account?{" "}
-          <Link href="/signup" style={{ color: "var(--phosphor)", textDecoration: "none" }}>
+          <Link href="/signup" style={{ color: "var(--ink)", textDecoration: "underline" }}>
             Request access
           </Link>
         </p>
       </div>
-    </main>
+    </div>
   );
 }

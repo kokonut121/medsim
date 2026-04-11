@@ -21,7 +21,7 @@ export default async function DashboardPage() {
     const facilities = await api.listFacilities();
 
     return (
-      <main className="shell shell-dark">
+      <main className="shell">
         <BackLink href="/" label="Hub" />
         <div className="panel">
           <div className="eyebrow">Dashboard</div>
@@ -45,7 +45,7 @@ export default async function DashboardPage() {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load facilities.";
     return (
-      <main className="shell shell-dark">
+      <main className="shell">
         <BackLink href="/" label="Hub" />
         <div className="panel">
           <div className="eyebrow">Dashboard</div>

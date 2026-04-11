@@ -3,7 +3,7 @@ import { FacilityOnboardingForm } from "@/components/facility/FacilityOnboarding
 
 export default function FacilityNewPage() {
   return (
-    <main className="shell shell-dark">
+    <main className="shell">
       <BackLink href="/dashboard" label="Hub" />
       <div className="panel">
         <div className="eyebrow">Facility onboarding</div>
