@@ -44,6 +44,21 @@ interface AgentPathDef extends AgentDef {
   totalLength: number;
 }
 
+const SKETCHFAB_MODEL_ID = "5edb97c206ae4ad2a022bfef354561cc";
+const SKETCHFAB_SRC = `https://sketchfab.com/models/${SKETCHFAB_MODEL_ID}/embed?autostart=1&animation_autoplay=1&ui_controls=0&ui_infos=0&ui_watermark=0&ui_stop=0&preload=1`;
+
+function hexToHue(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  if (d === 0) return 0;
+  let h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return Math.round(h * 60);
+}
+
 const TARGET_OVERLAY_FPS = 30;
 const LIVE_FINDINGS_LIMIT = 5;
 // ~2 seconds of motion at TARGET_OVERLAY_FPS — length of the dotted contrail.
@@ -60,11 +75,11 @@ function gridToWorld(col: number, row: number, height = 1.0): [number, number, n
 }
 
 const AGENT_ROLES = [
-  { role: "nurse", color: "#27ae60", speed: 0.55, cruiseHeight: 1.45, bobAmplitude: 0.08, bobRate: 1.2, bobPhase: 0.0 },
-  { role: "nurse", color: "#27ae60", speed: 0.48, cruiseHeight: 1.58, bobAmplitude: 0.1, bobRate: 1.0, bobPhase: 0.9 },
-  { role: "instructor", color: "#2980b9", speed: 0.65, cruiseHeight: 1.88, bobAmplitude: 0.12, bobRate: 1.3, bobPhase: 1.7 },
-  { role: "emergency_responder", color: "#c0392b", speed: 1.05, cruiseHeight: 1.72, bobAmplitude: 0.09, bobRate: 1.6, bobPhase: 2.4 },
-  { role: "supply_staff", color: "#8e44ad", speed: 0.38, cruiseHeight: 1.34, bobAmplitude: 0.06, bobRate: 0.85, bobPhase: 3.1 },
+  { role: "nurse", color: "#27ae60", speed: 0.55, cruiseHeight: 1.0, bobAmplitude: 0.08, bobRate: 1.2, bobPhase: 0.0 },
+  { role: "nurse", color: "#27ae60", speed: 0.48, cruiseHeight: 1.0, bobAmplitude: 0.1, bobRate: 1.0, bobPhase: 0.9 },
+  { role: "instructor", color: "#2980b9", speed: 0.65, cruiseHeight: 1.0, bobAmplitude: 0.12, bobRate: 1.3, bobPhase: 1.7 },
+  { role: "emergency_responder", color: "#c0392b", speed: 1.05, cruiseHeight: 1.0, bobAmplitude: 0.09, bobRate: 1.6, bobPhase: 2.4 },
+  { role: "supply_staff", color: "#8e44ad", speed: 0.38, cruiseHeight: 1.0, bobAmplitude: 0.06, bobRate: 0.85, bobPhase: 3.1 },
 ];
 
 const SEV_COLOR: Record<Severity, string> = {
@@ -708,7 +723,13 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
             title={agent.role}
             style={{ color: agent.color, opacity: 0, visibility: "hidden" }}
           >
-            <span className="agent-dot" />
+            <iframe
+              src={SKETCHFAB_SRC}
+              className="agent-sketchfab"
+              style={{ filter: `hue-rotate(${hexToHue(agent.color)}deg) saturate(1.8)` }}
+              allow="autoplay"
+              title={agent.role}
+            />
           </div>
         ))}
       </div>

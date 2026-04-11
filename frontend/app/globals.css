@@ -1041,13 +1041,21 @@ tr:hover td {
   font-weight: 300;
 }
 
-/* ═ Swarm agent dots ═ */
+/* ═ Swarm agents (Sketchfab embed) ═ */
 .agent-marker {
   position: absolute;
-  width: 0;
-  height: 0;
+  width: 72px;
+  height: 96px;
   pointer-events: none;
   will-change: transform, opacity;
+}
+
+.agent-sketchfab {
+  width: 100%;
+  height: 100%;
+  border: none;
+  pointer-events: none;
+  background: transparent;
 }
 
 .agent-trail-canvas {
@@ -1058,24 +1066,6 @@ tr:hover td {
   pointer-events: none;
 }
 
-.agent-dot {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  background:
-    radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.96), currentColor 62%);
-  box-shadow:
-    0 0 14px currentColor,
-    0 0 28px rgba(240, 234, 220, 0.2),
-    0 0 0 1px rgba(240, 234, 220, 0.34);
-  opacity: 0.9;
-  pointer-events: none;
-  will-change: transform, opacity;
-}
 
 /* ═ Brand mark — top-left dossier header ═ */
 .world-brand {
