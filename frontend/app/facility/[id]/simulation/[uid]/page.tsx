@@ -1,5 +1,8 @@
+import type { Route } from "next";
+
 import { SimulationClient } from "./SimulationClient";
 
+import { BackLink } from "@/components/ui/BackLink";
 import { api } from "@/lib/api";
 import type { ScenarioSimulation } from "@/types";
 
@@ -18,6 +21,7 @@ export default async function SimulationPage({
 
   return (
     <main className="shell">
+      <BackLink href={`/facility/${id}` as Route} label="Facility overview" />
       <div className="panel">
         <div className="eyebrow">Facility {id}</div>
         <h1 className="page-title">Scenario simulation</h1>

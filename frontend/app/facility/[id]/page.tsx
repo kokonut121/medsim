@@ -2,6 +2,7 @@ import type { Route } from "next";
 import Link from "next/link";
 
 import { AcquisitionPanel } from "@/components/facility/AcquisitionPanel";
+import { BackLink } from "@/components/ui/BackLink";
 import { api } from "@/lib/api";
 
 export default async function FacilityDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -10,6 +11,7 @@ export default async function FacilityDetailPage({ params }: { params: Promise<{
 
   return (
     <main className="shell">
+      <BackLink href="/dashboard" label="Dashboard" />
       <div className="panel">
         <div className="eyebrow">{data.facility.address}</div>
         <h1 className="page-title">{data.facility.name}</h1>
