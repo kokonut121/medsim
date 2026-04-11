@@ -1,8 +1,16 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
-import { AgentReasoningGraph } from "@/components/simulation/AgentReasoningGraph";
+// cytoscape-fcose accesses browser globals at module load time — dynamic import
+// with ssr:false keeps it out of the initial bundle and prevents the webpack
+// "Cannot read properties of undefined (reading 'call')" crash on navigation.
+const AgentReasoningGraph = dynamic(
+  () => import("@/components/simulation/AgentReasoningGraph").then((m) => ({ default: m.AgentReasoningGraph })),
+  { ssr: false, loading: () => <div className="panel" style={{ minHeight: 200 }} /> },
+);
+
 import { AgentTraceFeed } from "@/components/simulation/AgentTraceFeed";
 import { BestPlanReport, SimulationWarnings } from "@/components/simulation/BestPlanReport";
 import { deriveReasoningGraph } from "@/components/simulation/deriveReasoningGraph";
