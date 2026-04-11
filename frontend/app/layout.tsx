@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-import "mapbox-gl/dist/mapbox-gl.css";
 
 const fraunces = Fraunces({
   subsets: ["latin"],

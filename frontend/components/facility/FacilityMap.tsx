@@ -1,5 +1,7 @@
 "use client";
 
+import "mapbox-gl/dist/mapbox-gl.css";
+
 import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
