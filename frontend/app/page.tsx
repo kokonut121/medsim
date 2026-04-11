@@ -4,7 +4,10 @@ import { getFallbackSplatUrl, resolveSplatAssetUrl } from "@/lib/splat";
 
 async function getSplatUrl(): Promise<string> {
   try {
-    const res = await fetch(buildApiUrl("/api/models/unit_1/splat"), { cache: "no-store" });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(buildApiUrl("/api/models/unit_1/splat"), { cache: "no-store", signal: controller.signal });
+    clearTimeout(timeout);
     if (!res.ok) return "";
     return resolveSplatAssetUrl(
       (await res.json()) as { signed_url: string; stream_url?: string },
