@@ -138,20 +138,20 @@ const AGENT_TRAIL_SAMPLES = 60;
 const UNIT_ID = "unit_1";
 
 // Grid → world coordinate mapping (must match backend team_utils.py)
-const GRID_SCALE = 0.8;
-const COL_ORIGIN = 2.0;
-const ROW_ORIGIN = 1.5;
+const GRID_SCALE = 3.5;
+const COL_ORIGIN = 0.86;
+const ROW_ORIGIN = 0.5;
 
 function gridToWorld(col: number, row: number, height = 1.0): [number, number, number] {
   return [(col - COL_ORIGIN) * GRID_SCALE, height, (row - ROW_ORIGIN) * GRID_SCALE];
 }
 
 const AGENT_ROLES = [
-  { role: "nurse", color: "#27ae60", speed: 0.55, cruiseHeight: 0.5, bobAmplitude: 0.08, bobRate: 1.2, bobPhase: 0.0 },
-  { role: "nurse", color: "#27ae60", speed: 0.48, cruiseHeight: 0.5, bobAmplitude: 0.1, bobRate: 1.0, bobPhase: 0.9 },
-  { role: "instructor", color: "#2980b9", speed: 0.65, cruiseHeight: 0.5, bobAmplitude: 0.12, bobRate: 1.3, bobPhase: 1.7 },
-  { role: "emergency_responder", color: "#c0392b", speed: 1.05, cruiseHeight: 0.5, bobAmplitude: 0.09, bobRate: 1.6, bobPhase: 2.4 },
-  { role: "supply_staff", color: "#8e44ad", speed: 0.38, cruiseHeight: 0.5, bobAmplitude: 0.06, bobRate: 0.85, bobPhase: 3.1 },
+  { role: "nurse", color: "#27ae60", speed: 0.55, cruiseHeight: 1.1, bobAmplitude: 0.08, bobRate: 1.2, bobPhase: 0.0 },
+  { role: "nurse", color: "#27ae60", speed: 0.48, cruiseHeight: 1.1, bobAmplitude: 0.1, bobRate: 1.0, bobPhase: 0.9 },
+  { role: "instructor", color: "#2980b9", speed: 0.65, cruiseHeight: 1.1, bobAmplitude: 0.12, bobRate: 1.3, bobPhase: 1.7 },
+  { role: "emergency_responder", color: "#c0392b", speed: 1.05, cruiseHeight: 1.1, bobAmplitude: 0.09, bobRate: 1.6, bobPhase: 2.4 },
+  { role: "supply_staff", color: "#8e44ad", speed: 0.38, cruiseHeight: 1.1, bobAmplitude: 0.06, bobRate: 0.85, bobPhase: 3.1 },
 ];
 
 const SEV_COLOR: Record<Severity, string> = {
@@ -185,14 +185,14 @@ const DOMAIN_LABEL: Record<string, string> = {
 };
 
 function buildAgentPaths(rooms: Array<Record<string, unknown>>): AgentPathDef[] {
-  const corridors = rooms.filter((r) => r.type === "corridor" || r.type === "hallway");
+  const corridors = rooms.filter((r) => r.type === "corridor" || r.type === "hallway" || r.type === "corridor_hallway");
   const patientRooms = rooms.filter((r) =>
     ["patient_room", "icu_bay", "simulation_room", "skills_lab"].includes(r.type as string),
   );
   const sortedCorridors = corridors.sort((a, b) => {
-    const aCol = (a.grid_col as number) ?? 0;
-    const bCol = (b.grid_col as number) ?? 0;
-    return aCol - bCol;
+    const aRow = (a.grid_row as number) ?? 0;
+    const bRow = (b.grid_row as number) ?? 0;
+    return aRow - bRow;
   });
 
   return AGENT_ROLES.map((roleInfo, i) => {
@@ -205,10 +205,10 @@ function buildAgentPaths(rooms: Array<Record<string, unknown>>): AgentPathDef[] 
           ),
         )
       : [
-          [-1, roleInfo.cruiseHeight, -1],
-          [1, roleInfo.cruiseHeight, -1],
-          [1, roleInfo.cruiseHeight, 1],
-          [-1, roleInfo.cruiseHeight, 1],
+          [0.5, roleInfo.cruiseHeight, 0.0],
+          [0.5, roleInfo.cruiseHeight, 5.0],
+          [0.5, roleInfo.cruiseHeight, 10.0],
+          [0.5, roleInfo.cruiseHeight, 0.0],
         ];
     const loopPath: Array<[number, number, number]> = [...corridorWaypoints, corridorWaypoints[0]];
 

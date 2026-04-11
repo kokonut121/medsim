@@ -91,9 +91,9 @@ class MemoryIRISClient:
                             "adjacency": ["NL-HALL"],
                             "sightline_to_nursing_station": False,
                             "image_source_quality": "supplemental",
-                            "grid_col": 0, "grid_row": 0,
+                            "grid_col": 1, "grid_row": 0,
                         },
-                        # ── Main Hallway ───────────────────────────────────────
+                        # ── Main Hallway (3 waypoints for agent patrol) ────────
                         {
                             "room_id": "NL-HALL",
                             "type": "corridor_hallway",
@@ -104,7 +104,27 @@ class MemoryIRISClient:
                             "adjacency": ["NL-ENTRY", "NL-SIM1", "NL-SIM2", "NL-SIM3", "NL-DEBRIEF", "NL-SKILLS-A", "NL-SKILLS-B", "NL-SUPPLY", "NL-CONTROL"],
                             "sightline_to_nursing_station": True,
                             "image_source_quality": "supplemental",
-                            "grid_col": 0, "grid_row": 1,
+                            "grid_col": 1, "grid_row": 1,
+                        },
+                        {
+                            "room_id": "NL-HALL-MID",
+                            "type": "corridor_hallway",
+                            "area_sqft_estimate": 0,
+                            "equipment": [],
+                            "adjacency": ["NL-HALL"],
+                            "sightline_to_nursing_station": True,
+                            "image_source_quality": "supplemental",
+                            "grid_col": 1, "grid_row": 2,
+                        },
+                        {
+                            "room_id": "NL-HALL-FAR",
+                            "type": "corridor_hallway",
+                            "area_sqft_estimate": 0,
+                            "equipment": [],
+                            "adjacency": ["NL-HALL"],
+                            "sightline_to_nursing_station": False,
+                            "image_source_quality": "supplemental",
+                            "grid_col": 1, "grid_row": 3,
                         },
                         # ── Simulation Bays ────────────────────────────────────
                         {
@@ -120,7 +140,7 @@ class MemoryIRISClient:
                             "adjacency": ["NL-HALL"],
                             "sightline_to_nursing_station": True,
                             "image_source_quality": "supplemental",
-                            "grid_col": 0, "grid_row": 2,
+                            "grid_col": 0, "grid_row": 1,
                         },
                         {
                             "room_id": "NL-SIM2",
@@ -135,7 +155,7 @@ class MemoryIRISClient:
                             "adjacency": ["NL-HALL"],
                             "sightline_to_nursing_station": True,
                             "image_source_quality": "supplemental",
-                            "grid_col": 1, "grid_row": 2,
+                            "grid_col": 0, "grid_row": 2,
                         },
                         {
                             "room_id": "NL-SIM3",
@@ -150,7 +170,7 @@ class MemoryIRISClient:
                             "adjacency": ["TC-CORRIDOR"],
                             "sightline_to_nursing_station": False,
                             "image_source_quality": "places",
-                            "grid_col": 2, "grid_row": 2,
+                            "grid_col": 0, "grid_row": 3,
                         },
                         # ── Debriefing Room ────────────────────────────────────
                         {
@@ -164,7 +184,7 @@ class MemoryIRISClient:
                             "adjacency": ["NL-HALL"],
                             "sightline_to_nursing_station": False,
                             "image_source_quality": "supplemental",
-                            "grid_col": 3, "grid_row": 2,
+                            "grid_col": 1, "grid_row": 4,
                         },
                         # ── Skills Station A ───────────────────────────────────
                         {
@@ -178,7 +198,7 @@ class MemoryIRISClient:
                             "adjacency": ["NL-HALL"],
                             "sightline_to_nursing_station": False,
                             "image_source_quality": "supplemental",
-                            "grid_col": 0, "grid_row": 3,
+                            "grid_col": 0, "grid_row": 0,
                         },
                         # ── Skills Station B ───────────────────────────────────
                         {
@@ -192,7 +212,7 @@ class MemoryIRISClient:
                             "adjacency": ["NL-HALL"],
                             "sightline_to_nursing_station": False,
                             "image_source_quality": "supplemental",
-                            "grid_col": 1, "grid_row": 3,
+                            "grid_col": 0, "grid_row": 4,
                         },
                         # ── Supply / Medication Room ───────────────────────────
                         {
@@ -206,7 +226,7 @@ class MemoryIRISClient:
                             "adjacency": ["NL-HALL"],
                             "sightline_to_nursing_station": False,
                             "image_source_quality": "supplemental",
-                            "grid_col": 2, "grid_row": 3,
+                            "grid_col": 1, "grid_row": 2,
                         },
                         # ── Control / Faculty Room ─────────────────────────────
                         {
@@ -220,7 +240,7 @@ class MemoryIRISClient:
                             "adjacency": ["NL-HALL"],
                             "sightline_to_nursing_station": False,
                             "image_source_quality": "supplemental",
-                            "grid_col": 3, "grid_row": 3,
+                            "grid_col": 1, "grid_row": 3,
                         },
                     ],
                 }
