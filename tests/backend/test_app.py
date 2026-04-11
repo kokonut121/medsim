@@ -83,7 +83,7 @@ def test_fhir_routes_return_synthetic_projection_for_completed_scan():
 def test_fhir_service_client_falls_back_to_synthetic_projection(monkeypatch):
     settings = Settings(
         _env_file=None,
-        MEDSENTINEL_IRIS_MODE="fhir",
+        MEDSIM_IRIS_MODE="fhir",
         IRIS_FHIR_BASE="http://example.test/fhir/r4",
         IRIS_USER="medsent_app",
         IRIS_PASSWORD="changeme",

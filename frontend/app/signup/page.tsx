@@ -52,7 +52,7 @@ export default function SignupPage() {
 
       <Link href="/" style={{ textDecoration: "none", marginBottom: 40 }}>
         <div style={{ fontFamily: "var(--font-display-stack)", fontSize: 22, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.03em" }}>
-          Med<span style={{ color: "var(--signal)" }}>Sentinel</span>
+          Med<span style={{ color: "var(--signal)" }}>Sim</span>
         </div>
       </Link>
 
@@ -68,7 +68,7 @@ export default function SignupPage() {
           Request access
         </div>
         <h1 style={{ margin: "0 0 6px", fontFamily: "var(--font-display-stack)", fontSize: 28, fontWeight: 300, color: "var(--ink)", letterSpacing: "-0.03em" }}>
-          Join MedSentinel.
+          Join MedSim.
         </h1>
         <p style={{ margin: "0 0 28px", color: "var(--mercury)", fontSize: 13, fontFamily: "var(--font-body-stack)" }}>
           Currently invite-only. Tell us about your facility.

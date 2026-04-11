@@ -72,7 +72,7 @@ export default function LandingPage() {
             color: "var(--ink)",
           }}
         >
-          Med<span style={{ color: "var(--signal)" }}>Sentinel</span>
+          Med<span style={{ color: "var(--signal)" }}>Sim</span>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <Link
@@ -168,7 +168,7 @@ export default function LandingPage() {
               fontFamily: "var(--font-body-stack)",
             }}
           >
-            MedSentinel reconstructs your trauma center in 3D, deploys AI safety agent teams
+            MedSim reconstructs your trauma center in 3D, deploys AI safety agent teams
             across the model, and surfaces critical findings before they become incidents.
           </p>
 
@@ -433,7 +433,7 @@ export default function LandingPage() {
             color: "var(--ink)",
           }}
         >
-          Ready to deploy MedSentinel?
+          Ready to deploy MedSim?
         </h2>
         <p
           style={{
@@ -489,7 +489,7 @@ export default function LandingPage() {
             color: "var(--ink)",
           }}
         >
-          Med<span style={{ color: "var(--signal)" }}>Sentinel</span>
+          Med<span style={{ color: "var(--signal)" }}>Sim</span>
         </div>
         <p
           style={{
@@ -500,7 +500,7 @@ export default function LandingPage() {
             letterSpacing: "0.1em",
           }}
         >
-          © 2025 MEDSENTINEL · TRAUMA CENTER INTELLIGENCE
+          © 2025 MEDSIM · TRAUMA CENTER INTELLIGENCE
         </p>
       </footer>
 

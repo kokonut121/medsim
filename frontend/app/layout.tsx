@@ -24,7 +24,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MedSentinel",
+  title: "MedSim",
   description: "AI world model + agent orchestration network for hospital safety and operations intelligence"
 };
 

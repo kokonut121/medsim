@@ -27,7 +27,7 @@ async function parse<T>(path: string, init?: RequestInit): Promise<T> {
     });
   } catch (error) {
     throw new Error(
-      `Unable to reach MedSentinel backend at ${API_BASE}. Start the FastAPI server with \`./scripts/start-backend.sh\` from the repo root and retry.`,
+      `Unable to reach MedSim backend at ${API_BASE}. Start the FastAPI server with \`./scripts/start-backend.sh\` from the repo root and retry.`,
       { cause: error }
     );
   }

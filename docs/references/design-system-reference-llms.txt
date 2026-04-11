@@ -1,4 +1,4 @@
-MedSentinel visual cues:
+MedSim visual cues:
 - warm neutral canvas
 - decisive alert colors
 - large viewer-first layouts

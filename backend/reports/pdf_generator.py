@@ -69,14 +69,14 @@ def _get_facility_images(unit_id: str) -> list[tuple[str, str]]:
 def build_pdf(scan: Scan) -> bytes:
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=letter)
-    pdf.setTitle(f"MedSentinel Safety Report — {scan.scan_id}")
+    pdf.setTitle(f"MedSim Safety Report — {scan.scan_id}")
 
     # ---- Header ----
     pdf.setFillColor(colors.HexColor("#1a3c5e"))
     pdf.rect(0, PAGE_H - 60, PAGE_W, 60, fill=1, stroke=0)
     pdf.setFillColor(colors.white)
     pdf.setFont("Helvetica-Bold", 16)
-    pdf.drawString(MARGIN, PAGE_H - 38, "MedSentinel Safety Report")
+    pdf.drawString(MARGIN, PAGE_H - 38, "MedSim Safety Report")
     pdf.setFont("Helvetica", 10)
     pdf.drawString(MARGIN, PAGE_H - 52, f"Unit: {scan.unit_id}  |  Scan: {scan.scan_id}  |  Status: {scan.status}")
 

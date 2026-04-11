@@ -35,7 +35,7 @@ _OBS_CATEGORY = {
     ]
 }
 
-# MedSentinel extension base URL
+# MedSim extension base URL
 _EXT_BASE = "https://medsent.io/fhir/StructureDefinition"
 _FHIR_ID_INVALID_CHARS = re.compile(r"[^A-Za-z0-9\-.]")
 
@@ -55,7 +55,7 @@ def _scan_timestamp(scan: Scan) -> str:
 
 def _device_subject(unit_id: str) -> dict:
     """
-    FHIR Observation/DiagnosticReport requires a subject.  Because MedSentinel
+    FHIR Observation/DiagnosticReport requires a subject.  Because MedSim
     scans a physical space (not a patient) we model the subject as a Device
     whose identifier is the unit being scanned.
     """
@@ -87,7 +87,7 @@ def build_diagnostic_report(scan: Scan) -> dict:
         "resourceType": "DiagnosticReport",
         "id": fhir_safe_id(scan.scan_id),
         "meta": {
-            "profile": [f"{_EXT_BASE}/MedSentinelDiagnosticReport"],
+            "profile": [f"{_EXT_BASE}/MedSimDiagnosticReport"],
         },
         "identifier": [
             {
@@ -109,7 +109,7 @@ def build_diagnostic_report(scan: Scan) -> dict:
         ],
         "code": {
             "coding": [_REPORT_CODING],
-            "text": f"MedSentinel Scan {scan.scan_id}",
+            "text": f"MedSim Scan {scan.scan_id}",
         },
         "subject": _device_subject(scan.unit_id),
         "effectiveDateTime": timestamp,
@@ -134,7 +134,7 @@ def build_observation(finding: Finding) -> dict:
         "resourceType": "Observation",
         "id": fhir_safe_id(finding.finding_id),
         "meta": {
-            "profile": [f"{_EXT_BASE}/MedSentinelObservation"],
+            "profile": [f"{_EXT_BASE}/MedSimObservation"],
         },
         "identifier": [
             {

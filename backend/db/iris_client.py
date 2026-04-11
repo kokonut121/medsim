@@ -715,7 +715,7 @@ class MemoryIRISClient:
 
 class FHIRServiceIRISClient(MemoryIRISClient):
     """
-    FHIR-only mode: keep MedSentinel domain data in the in-memory dev store,
+    FHIR-only mode: keep MedSim domain data in the in-memory dev store,
     but use the live IRIS FHIR repository for interoperability reads/writes
     whenever it is available.
     """
@@ -769,7 +769,7 @@ class NativeIRISClient:
         except ImportError as exc:
             raise RuntimeError(
                 "InterSystems native mode requires the 'intersystems-irispython' package. "
-                "Install backend dependencies before setting MEDSENTINEL_IRIS_MODE=native."
+                "Install backend dependencies before setting MEDSIM_IRIS_MODE=native."
             ) from exc
 
         self._settings = settings
@@ -795,48 +795,48 @@ class NativeIRISClient:
 
     def _verify_native_global_access(self) -> None:
         try:
-            self._iris.node("^MedSentinel.Bootstrap").get("namespace", None)
+            self._iris.node("^MedSim.Bootstrap").get("namespace", None)
         except RuntimeError as exc:
             if "%Native_GlobalAccess" not in str(exc):
                 raise
             raise RuntimeError(
                 "IRIS native mode connected successfully, but the configured service account lacks the "
-                "%Native_GlobalAccess resource. Re-run the MedSentinel IRIS bootstrap so the service role "
+                "%Native_GlobalAccess resource. Re-run the MedSim IRIS bootstrap so the service role "
                 "is granted native global access."
             ) from exc
 
     @property
     def facilities(self) -> dict[str, Facility]:
-        return self._load_models("MedSentinel.Facility", Facility)
+        return self._load_models("MedSim.Facility", Facility)
 
     @property
     def units(self) -> dict[str, Unit]:
-        return self._load_models("MedSentinel.Unit", Unit)
+        return self._load_models("MedSim.Unit", Unit)
 
     @property
     def models(self) -> dict[str, WorldModel]:
-        return self._load_models("MedSentinel.WorldModel", WorldModel)
+        return self._load_models("MedSim.WorldModel", WorldModel)
 
     @property
     def scans(self) -> dict[str, Scan]:
-        return self._load_models("MedSentinel.Scan", Scan)
+        return self._load_models("MedSim.Scan", Scan)
 
     @property
     def images(self) -> dict[str, ImageMeta]:
-        return self._load_models("MedSentinel.ImageMeta", ImageMeta)
+        return self._load_models("MedSim.ImageMeta", ImageMeta)
 
     @property
     def coverage_maps(self) -> dict[str, CoverageMap]:
-        return self._load_models("MedSentinel.CoverageMap", CoverageMap)
+        return self._load_models("MedSim.CoverageMap", CoverageMap)
 
     @property
     def simulations(self) -> dict[str, ScenarioSimulation]:
-        return self._load_models("MedSentinel.ScenarioSimulation", ScenarioSimulation)
+        return self._load_models("MedSim.ScenarioSimulation", ScenarioSimulation)
 
     @property
     def findings_by_scan(self) -> defaultdict[str, list[Finding]]:
         grouped: defaultdict[str, list[Finding]] = defaultdict(list)
-        for finding in self._load_models("MedSentinel.Finding", Finding).values():
+        for finding in self._load_models("MedSim.Finding", Finding).values():
             grouped[finding.scan_id].append(finding)
         return grouped
 
@@ -860,13 +860,13 @@ class NativeIRISClient:
         # Reuse the same seed data shape as memory mode.
         memory = MemoryIRISClient()
         for facility in memory.facilities.values():
-            self._store_model("MedSentinel.Facility", facility.facility_id, facility)
+            self._store_model("MedSim.Facility", facility.facility_id, facility)
         for unit in memory.units.values():
-            self._store_model("MedSentinel.Unit", unit.unit_id, unit)
+            self._store_model("MedSim.Unit", unit.unit_id, unit)
         for model in memory.models.values():
-            self._store_model("MedSentinel.WorldModel", model.model_id, model)
+            self._store_model("MedSim.WorldModel", model.model_id, model)
         for coverage in memory.coverage_maps.values():
-            self._store_model("MedSentinel.CoverageMap", coverage.facility_id, coverage)
+            self._store_model("MedSim.CoverageMap", coverage.facility_id, coverage)
 
     def _store_json(self, global_name: str, record_id: str, payload: dict[str, Any]) -> None:
         self._iris.node(global_name)[record_id] = json.dumps(payload)
@@ -910,7 +910,7 @@ class NativeIRISClient:
             osm_building_id=getattr(payload, "osm_building_id", None) or f"osm_{facility_id}",
             created_at=utcnow(),
         )
-        self._store_model("MedSentinel.Facility", facility_id, created)
+        self._store_model("MedSim.Facility", facility_id, created)
 
         unit = Unit(
             unit_id=f"{facility_id}_unit_1",
@@ -920,7 +920,7 @@ class NativeIRISClient:
             unit_type=payload.unit_type or "Trauma",
             created_at=utcnow(),
         )
-        self._store_model("MedSentinel.Unit", unit.unit_id, unit)
+        self._store_model("MedSim.Unit", unit.unit_id, unit)
 
         coverage = CoverageMap(
             facility_id=facility_id,
@@ -928,7 +928,7 @@ class NativeIRISClient:
             gap_areas=[GapArea(area_id="facility_pending", description="Imagery acquisition not started")],
             updated_at=utcnow(),
         )
-        self._store_model("MedSentinel.CoverageMap", facility_id, coverage)
+        self._store_model("MedSim.CoverageMap", facility_id, coverage)
         return created
 
     def get_facility(self, facility_id: str) -> dict[str, Any]:
@@ -946,18 +946,18 @@ class NativeIRISClient:
         doomed_models = [model_id for model_id, model in self.models.items() if model.unit_id in doomed_units]
         doomed_images = [image_id for image_id, image in self.images.items() if image.facility_id == facility_id]
         for unit_id in doomed_units:
-            self._delete_record("MedSentinel.Unit", unit_id)
+            self._delete_record("MedSim.Unit", unit_id)
         for model_id in doomed_models:
-            self._delete_record("MedSentinel.WorldModel", model_id)
+            self._delete_record("MedSim.WorldModel", model_id)
         for image_id in doomed_images:
-            self._delete_record("MedSentinel.ImageMeta", image_id)
+            self._delete_record("MedSim.ImageMeta", image_id)
         for scan_id, scan in self.scans.items():
             if scan.unit_id in doomed_units:
                 for finding in scan.findings:
-                    self._delete_record("MedSentinel.Finding", finding.finding_id)
-                self._delete_record("MedSentinel.Scan", scan_id)
-        self._delete_record("MedSentinel.CoverageMap", facility_id)
-        self._delete_record("MedSentinel.Facility", facility_id)
+                    self._delete_record("MedSim.Finding", finding.finding_id)
+                self._delete_record("MedSim.Scan", scan_id)
+        self._delete_record("MedSim.CoverageMap", facility_id)
+        self._delete_record("MedSim.Facility", facility_id)
 
     def get_coverage(self, facility_id: str) -> CoverageMap:
         return self.coverage_maps[facility_id]
@@ -976,7 +976,7 @@ class NativeIRISClient:
             world_labs_world_id="",
             created_at=utcnow(),
         )
-        return self._store_model("MedSentinel.WorldModel", model.model_id, model)
+        return self._store_model("MedSim.WorldModel", model.model_id, model)
 
     def update_model(
         self,
@@ -1019,7 +1019,7 @@ class NativeIRISClient:
         if completed_at is not None:
             updates["completed_at"] = completed_at
         updated = WorldModel.model_validate(updates)
-        return self._store_model("MedSentinel.WorldModel", model_id, updated)
+        return self._store_model("MedSim.WorldModel", model_id, updated)
 
     def write_world_model(self, facility_id: str, world_model: dict[str, Any], model_id: str | None = None) -> WorldModel:
         unit = self.get_unit_for_facility(facility_id)
@@ -1039,10 +1039,10 @@ class NativeIRISClient:
             created_at=created_at,
             completed_at=utcnow(),
         )
-        return self._store_model("MedSentinel.WorldModel", ready_model.model_id, ready_model)
+        return self._store_model("MedSim.WorldModel", ready_model.model_id, ready_model)
 
     def write_image_meta(self, image_meta: ImageMeta) -> ImageMeta:
-        return self._store_model("MedSentinel.ImageMeta", image_meta.image_id, image_meta)
+        return self._store_model("MedSim.ImageMeta", image_meta.image_id, image_meta)
 
     def update_image_classification(self, image_id: str, *, category: str, confidence: float, notes: str | None = None) -> ImageMeta:
         image = self.images[image_id]
@@ -1051,7 +1051,7 @@ class NativeIRISClient:
         updates["confidence"] = confidence
         updates["notes"] = notes
         updated = ImageMeta.model_validate(updates)
-        return self._store_model("MedSentinel.ImageMeta", image_id, updated)
+        return self._store_model("MedSim.ImageMeta", image_id, updated)
 
     def list_images_for_facility(self, facility_id: str) -> list[ImageMeta]:
         return [image for image in self.images.values() if image.facility_id == facility_id]
@@ -1063,7 +1063,7 @@ class NativeIRISClient:
             gap_areas=gap_areas,
             updated_at=utcnow(),
         )
-        return self._store_model("MedSentinel.CoverageMap", facility_id, coverage)
+        return self._store_model("MedSim.CoverageMap", facility_id, coverage)
 
     def create_upload_session(self, upload_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         self.upload_sessions[upload_id] = payload
@@ -1078,27 +1078,27 @@ class NativeIRISClient:
         return session
 
     def write_scan(self, scan: Scan) -> Scan:
-        return self._store_model("MedSentinel.Scan", scan.scan_id, scan)
+        return self._store_model("MedSim.Scan", scan.scan_id, scan)
 
     def get_scan(self, scan_id: str) -> Scan:
-        scan = self._load_json("MedSentinel.Scan", scan_id)
+        scan = self._load_json("MedSim.Scan", scan_id)
         if scan is None:
             raise KeyError(scan_id)
         return Scan.model_validate(scan)
 
     def update_scan_status(self, scan_id: str, status: str) -> Scan | None:
-        scan = self._load_json("MedSentinel.Scan", scan_id)
+        scan = self._load_json("MedSim.Scan", scan_id)
         if scan is None:
             return None
         scan["status"] = status
         updated = Scan.model_validate(scan)
-        return self._store_model("MedSentinel.Scan", scan_id, updated)
+        return self._store_model("MedSim.Scan", scan_id, updated)
 
     def write_findings(self, scan: Scan, findings: list[Finding]) -> Scan:
         stored_scan = scan.model_copy(update={"findings": findings})
         for finding in findings:
-            self._store_model("MedSentinel.Finding", finding.finding_id, finding)
-        self._store_model("MedSentinel.Scan", stored_scan.scan_id, stored_scan)
+            self._store_model("MedSim.Finding", finding.finding_id, finding)
+        self._store_model("MedSim.Scan", stored_scan.scan_id, stored_scan)
         self._project_fhir_resources(stored_scan)
         return stored_scan
 
@@ -1122,10 +1122,10 @@ class NativeIRISClient:
         return findings
 
     def get_finding(self, finding_id: str) -> Finding:
-        finding = self._load_json("MedSentinel.Finding", finding_id)
+        finding = self._load_json("MedSim.Finding", finding_id)
         if finding is not None:
             return Finding.model_validate(finding)
-        for candidate in self._load_models("MedSentinel.Finding", Finding).values():
+        for candidate in self._load_models("MedSim.Finding", Finding).values():
             if fhir_safe_id(candidate.finding_id) == finding_id:
                 return candidate
         raise KeyError(finding_id)
@@ -1140,19 +1140,19 @@ class NativeIRISClient:
         return sorted(models, key=lambda item: item.created_at)[-1]
 
     def write_simulation(self, sim: ScenarioSimulation) -> ScenarioSimulation:
-        return self._store_model("MedSentinel.ScenarioSimulation", sim.simulation_id, sim)
+        return self._store_model("MedSim.ScenarioSimulation", sim.simulation_id, sim)
 
     def update_simulation(self, simulation_id: str, **updates: object) -> ScenarioSimulation:
-        simulation = self._load_json("MedSentinel.ScenarioSimulation", simulation_id)
+        simulation = self._load_json("MedSim.ScenarioSimulation", simulation_id)
         if simulation is None:
             raise KeyError(simulation_id)
         for key, value in updates.items():
             simulation[key] = value
         updated = ScenarioSimulation.model_validate(simulation)
-        return self._store_model("MedSentinel.ScenarioSimulation", simulation_id, updated)
+        return self._store_model("MedSim.ScenarioSimulation", simulation_id, updated)
 
     def get_simulation(self, simulation_id: str) -> ScenarioSimulation:
-        simulation = self._load_json("MedSentinel.ScenarioSimulation", simulation_id)
+        simulation = self._load_json("MedSim.ScenarioSimulation", simulation_id)
         if simulation is None:
             raise KeyError(simulation_id)
         return ScenarioSimulation.model_validate(simulation)

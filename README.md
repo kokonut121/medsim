@@ -1,8 +1,8 @@
-# MedSentinel
+# MedSim
 
 > AI World Model + Agent Orchestration Network for Hospital Safety & Operations Intelligence
 
-Built for **Harvard's HSIL Hackathon**. MedSentinel automatically acquires public imagery of any hospital, generates a navigable 3D Gaussian-splat world model, then deploys six specialized AI agent teams into that model to identify and spatially annotate critical safety risks. Findings stream in real time to a Next.js viewer and are exportable as PDF and FHIR R4 DiagnosticReport artifacts, all secured through InterSystems IRIS for Health.
+Built for **Harvard's HSIL Hackathon**. MedSim automatically acquires public imagery of any hospital, generates a navigable 3D Gaussian-splat world model, then deploys six specialized AI agent teams into that model to identify and spatially annotate critical safety risks. Findings stream in real time to a Next.js viewer and are exportable as PDF and FHIR R4 DiagnosticReport artifacts, all secured through InterSystems IRIS for Health.
 
 ---
 
@@ -189,9 +189,9 @@ cp .env.example .env
 | `AUTH_SECRET` | Yes | Auth.js / Clerk secret |
 | `AUTH_GOOGLE_ID` | Yes | Google OAuth client ID |
 | `AUTH_GOOGLE_SECRET` | Yes | Google OAuth client secret |
-| `MEDSENTINEL_USE_SYNTHETIC_FALLBACKS` | No | Set `true` to run locally without live API keys |
+| `MEDSIM_USE_SYNTHETIC_FALLBACKS` | No | Set `true` to run locally without live API keys |
 
-> **Synthetic fallbacks**: setting `MEDSENTINEL_USE_SYNTHETIC_FALLBACKS=true` skips all external API calls (World Labs, Google, Modal) and returns deterministic stub data. This lets you run and develop the full stack with only Redis and IRIS running.
+> **Synthetic fallbacks**: setting `MEDSIM_USE_SYNTHETIC_FALLBACKS=true` skips all external API calls (World Labs, Google, Modal) and returns deterministic stub data. This lets you run and develop the full stack with only Redis and IRIS running.
 
 ---
 
@@ -220,7 +220,7 @@ pip install -r backend/requirements.txt
 ```bash
 cp .env.example .env
 # Edit .env and fill in your API keys
-# For a no-key local run: set MEDSENTINEL_USE_SYNTHETIC_FALLBACKS=true
+# For a no-key local run: set MEDSIM_USE_SYNTHETIC_FALLBACKS=true
 ```
 
 ### 4. Start the backend
@@ -288,7 +288,7 @@ docker compose down
    docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
    ```
 
-   The `docker-compose.prod.yml` sets `MEDSENTINEL_ENV=production`, removes IRIS public port bindings, and adds `restart: unless-stopped`.
+   The `docker-compose.prod.yml` sets `MEDSIM_ENV=production`, removes IRIS public port bindings, and adds `restart: unless-stopped`.
 
 3. **Verify IRIS initialization**
 

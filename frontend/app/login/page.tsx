@@ -17,7 +17,7 @@ export default function LoginPage() {
   }
 
   function handleDemo() {
-    setEmail("demo@medsentinel.ai");
+    setEmail("demo@medsim.ai");
     setPassword("sentinel2025");
     setLoading(true);
     setTimeout(() => router.push("/dashboard"), 600);
@@ -41,7 +41,7 @@ export default function LoginPage() {
 
       <Link href="/" style={{ textDecoration: "none", marginBottom: 40 }}>
         <div style={{ fontFamily: "var(--font-display-stack)", fontSize: 22, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.03em" }}>
-          Med<span style={{ color: "var(--signal)" }}>Sentinel</span>
+          Med<span style={{ color: "var(--signal)" }}>Sim</span>
         </div>
       </Link>
 
