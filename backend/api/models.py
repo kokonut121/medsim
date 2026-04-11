@@ -36,7 +36,7 @@ async def get_splat(unit_id: str):
     model = iris_client.get_model(unit_id)
     if model.status != "ready":
         raise HTTPException(status_code=409, detail=f"Model is {model.status}")
-    if not settings.r2_account_id:
+    if settings.use_synthetic_fallbacks or not settings.r2_account_id:
         raise HTTPException(status_code=404, detail="No splat asset available")
     if not model.splat_r2_key:
         raise HTTPException(status_code=404, detail="Model asset not found")
@@ -63,7 +63,7 @@ async def stream_splat(unit_id: str):
     if not model.splat_r2_key:
         raise HTTPException(status_code=404, detail="Model asset not found")
 
-    if not settings.r2_account_id:
+    if settings.use_synthetic_fallbacks or not settings.r2_account_id:
         raise HTTPException(status_code=404, detail="R2 not configured — no splat asset available")
 
     s3 = boto3.client(
