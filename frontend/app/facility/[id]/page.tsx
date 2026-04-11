@@ -1,9 +1,53 @@
 import type { Route } from "next";
 import Link from "next/link";
 
-import { AcquisitionPanel } from "@/components/facility/AcquisitionPanel";
 import { BackLink } from "@/components/ui/BackLink";
 import { api } from "@/lib/api";
+import type { WorldModel } from "@/types";
+
+function ModelInfoCard({ model }: { model: WorldModel | null }) {
+  if (!model) {
+    return (
+      <div className="progress-tile" style={{ marginTop: 12 }}>
+        <span className="muted">No world model yet.</span>
+      </div>
+    );
+  }
+
+  const statusColor =
+    model.status === "ready"
+      ? "var(--gain)"
+      : model.status === "failed"
+      ? "var(--critical)"
+      : "var(--muted)";
+
+  return (
+    <div className="progress-tile" style={{ marginTop: 12, display: "grid", gap: 6 }}>
+      {model.caption ? (
+        <p style={{ margin: 0, fontSize: 13 }}>{model.caption}</p>
+      ) : null}
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12 }}>
+        <span>
+          Status&nbsp;
+          <strong style={{ color: statusColor }}>{model.status}</strong>
+        </span>
+        {model.source_image_count ? (
+          <span className="muted">{model.source_image_count} source images</span>
+        ) : null}
+        {model.completed_at ? (
+          <span className="muted">
+            Built {new Date(model.completed_at).toLocaleDateString()}
+          </span>
+        ) : null}
+      </div>
+      {model.failure_reason ? (
+        <p style={{ margin: 0, fontSize: 12, color: "var(--critical)" }}>
+          {model.failure_reason}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 export default async function FacilityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -16,20 +60,22 @@ export default async function FacilityDetailPage({ params }: { params: Promise<{
         <div className="eyebrow">{data.facility.address}</div>
         <h1 className="page-title">{data.facility.name}</h1>
         <p className="muted">
-          Unit list, scan history, and launch points for coverage review, 3D world model inspection, and exports.
+          Live safety analysis, 3D world model inspection, scenario simulation, and compliance reports.
         </p>
       </div>
       <div style={{ height: 20 }} />
       <div className="card-grid">
         {data.units.map((unit) => {
-          const latestModel = data.models.find((model) => model.unit_id === unit.unit_id) ?? null;
+          const latestModel = data.models.find((m) => m.unit_id === unit.unit_id) ?? null;
 
           return (
             <div className="feed-card" key={unit.unit_id}>
               <div className="eyebrow">
                 Floor {unit.floor} · {unit.unit_type}
               </div>
-              <h3>{unit.name}</h3>
+              <h3 style={{ margin: "6px 0 4px" }}>{unit.name}</h3>
+              <ModelInfoCard model={latestModel} />
+              <div style={{ height: 16 }} />
               <div className="cta-row">
                 <Link className="button" href={`/facility/${id}/model/${unit.unit_id}` as Route}>
                   Open model
@@ -41,26 +87,6 @@ export default async function FacilityDetailPage({ params }: { params: Promise<{
                   Report
                 </Link>
               </div>
-              <div style={{ height: 16 }} />
-              <AcquisitionPanel
-                facilityId={id}
-                unitId={unit.unit_id}
-                initialStatus={
-                  latestModel
-                    ? {
-                        unit_id: unit.unit_id,
-                        model_id: latestModel.model_id,
-                        status: latestModel.status,
-                        failure_reason: latestModel.failure_reason ?? null,
-                        source_image_count: latestModel.source_image_count ?? 0,
-                        caption: latestModel.caption ?? null,
-                        thumbnail_url: latestModel.thumbnail_url ?? null,
-                        world_marble_url: latestModel.world_marble_url ?? null,
-                        completed_at: latestModel.completed_at
-                      }
-                    : null
-                }
-              />
             </div>
           );
         })}
