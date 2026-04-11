@@ -20,8 +20,8 @@ export default async function ModelPage({
   }
 
   return (
-    <main className="shell">
-      <BackLink href={`/facility/${id}` as Route} label="Facility overview" />
+    <main className="shell shell-dark">
+      <BackLink href={`/facility/${id}` as Route} label="Hub" />
       <div className="panel">
         <div className="eyebrow">Facility {id}</div>
         <h1 className="page-title">World model viewer</h1>

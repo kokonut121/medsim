@@ -140,7 +140,7 @@ export default async function ReportPage({
 
   return (
     <main className="shell">
-      <BackLink href={`/facility/${id}` as Route} label="Facility overview" />
+      <BackLink href={`/facility/${id}` as Route} label="Hub" />
 
       {/* header */}
       <div className="panel" style={{ marginBottom: 24 }}>

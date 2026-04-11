@@ -162,6 +162,99 @@ code, kbd, samp {
   .shell::after { left: 22px; top: 36px; }
 }
 
+/* ── Dark shell — midnight theme for app pages ── */
+.shell-dark {
+  --paper-hi:    var(--midnight-card);
+  --paper:       var(--midnight-elev);
+  --paper-low:   var(--midnight);
+  --ink:         var(--bone);
+  --ink-soft:    var(--bone-soft);
+  --mercury:     rgba(240, 234, 220, 0.50);
+  --mercury-hi:  rgba(240, 234, 220, 0.35);
+  --chalk:       var(--bone-chalk);
+  --chalk-hard:  var(--bone-chalk-hi);
+  --chalk-soft:  rgba(240, 234, 220, 0.04);
+  --shadow:      0 1px 0 var(--bone-chalk), 0 28px 60px rgba(0,0,0,0.5);
+  background: var(--midnight);
+  color: var(--bone);
+}
+
+/* Flatten the editorial block-shadow on dark cards */
+.shell-dark .panel,
+.shell-dark .feed-card,
+.shell-dark .finding-card,
+.shell-dark .stat {
+  background: var(--midnight-card);
+  border: 1px solid var(--bone-chalk);
+  box-shadow: 0 1px 0 var(--bone-chalk), 0 24px 48px rgba(0,0,0,0.35);
+}
+
+.shell-dark .panel .panel,
+.shell-dark .panel .feed-card {
+  box-shadow: 0 1px 0 rgba(240,234,220,0.06);
+}
+
+/* Buttons flip to phosphor-on-dark */
+.shell-dark .button {
+  background: var(--bone);
+  color: var(--midnight);
+  border-color: var(--bone);
+  box-shadow: 4px 4px 0 rgba(240,234,220,0.08), 4px 4px 0 1px var(--bone-chalk);
+}
+.shell-dark .button:hover {
+  box-shadow: 6px 6px 0 rgba(240,234,220,0.08), 6px 6px 0 1px var(--bone-chalk);
+}
+.shell-dark .button:active {
+  box-shadow: 2px 2px 0 rgba(240,234,220,0.08), 2px 2px 0 1px var(--bone-chalk);
+}
+.shell-dark .button.secondary {
+  background: transparent;
+  color: var(--bone);
+  border-color: var(--bone-chalk-hi);
+  box-shadow: 4px 4px 0 rgba(240,234,220,0.06), 4px 4px 0 1px var(--bone-chalk);
+}
+.shell-dark .button.secondary:hover {
+  background: var(--midnight-elev);
+}
+
+/* Decorative masthead + rule */
+.shell-dark::before {
+  color: rgba(240,234,220,0.25);
+  border-bottom-color: var(--bone-chalk);
+}
+.shell-dark::after {
+  background: var(--phosphor);
+}
+
+/* Tab rule on top-level panels */
+.shell-dark.shell > .panel::before {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--bone-chalk-hi) 0, var(--bone-chalk-hi) 14px,
+    transparent 14px, transparent 20px
+  );
+}
+.shell-dark.shell > .panel::after {
+  border-color: var(--bone-chalk);
+}
+
+/* Back-link */
+.shell-dark .back-link { color: rgba(240,234,220,0.45); }
+.shell-dark .back-link:hover { color: var(--bone); border-bottom-color: var(--bone); }
+
+/* Feed card hover */
+.shell-dark .feed-card:hover {
+  border-color: var(--bone-chalk-hi);
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 rgba(240,234,220,0.06), 4px 4px 0 1px var(--bone-chalk);
+}
+
+/* Progress tiles */
+.shell-dark .progress-tile {
+  background: var(--midnight-elev);
+  border-color: var(--bone-chalk);
+}
+
 /* ═══════════════════════════════════════════════
    TYPOGRAPHY
    ═══════════════════════════════════════════════ */
