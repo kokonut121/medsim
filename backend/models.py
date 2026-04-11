@@ -119,6 +119,7 @@ class WorldModel(BaseModel):
     caption: str | None = None
     thumbnail_url: str | None = None
     world_marble_url: str | None = None
+    spatial_bundle_json: dict = Field(default_factory=dict)
     created_at: datetime
     completed_at: datetime | None = None
 

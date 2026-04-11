@@ -232,6 +232,8 @@ class MemoryIRISClient:
                 "dirty_corridors": ["NL-SUPPLY"],
             },
         }
+        from backend.pipeline.spatial_bundle import build_spatial_bundle
+        spatial_bundle = build_spatial_bundle(scene_graph)
         self.models["model_unit_1"] = WorldModel(
             model_id="model_unit_1",
             unit_id="unit_1",
@@ -242,6 +244,7 @@ class MemoryIRISClient:
             world_marble_url="https://marble.worldlabs.ai/world/65bab75f-b181-4314-be3a-3b3cb88c3deb",
             caption="LeTourneau University — Nursing Skills Lab world model",
             source_image_count=0,
+            spatial_bundle_json=spatial_bundle,
             created_at=created_at,
             completed_at=created_at + timedelta(hours=1),
         )
@@ -428,6 +431,26 @@ class MemoryIRISClient:
         session = self.upload_sessions[upload_id]
         session.update(updates)
         return session
+
+    def write_scan(self, scan: Scan) -> Scan:
+        """Persist a Scan record (may be queued/running, no findings yet)."""
+        self.scans[scan.scan_id] = scan
+        return scan
+
+    def get_scan(self, scan_id: str) -> Scan:
+        if scan_id not in self.scans:
+            raise KeyError(scan_id)
+        return self.scans[scan_id]
+
+    def update_scan_status(self, scan_id: str, status: str) -> Scan | None:
+        scan = self.scans.get(scan_id)
+        if scan is None:
+            return None
+        updates = scan.model_dump()
+        updates["status"] = status
+        updated = Scan.model_validate(updates)
+        self.scans[scan_id] = updated
+        return updated
 
     def write_findings(self, scan: Scan, findings: list[Finding]) -> Scan:
         scan.findings = findings
@@ -787,6 +810,7 @@ class NativeIRISClient:
         caption: str | None = None,
         thumbnail_url: str | None = None,
         world_marble_url: str | None = None,
+        spatial_bundle_json: dict | None = None,
         completed_at: datetime | None = None,
     ) -> WorldModel:
         model = self.models[model_id]
@@ -809,6 +833,8 @@ class NativeIRISClient:
             updates["thumbnail_url"] = thumbnail_url
         if world_marble_url is not None:
             updates["world_marble_url"] = world_marble_url
+        if spatial_bundle_json is not None:
+            updates["spatial_bundle_json"] = spatial_bundle_json
         if completed_at is not None:
             updates["completed_at"] = completed_at
         updated = WorldModel.model_validate(updates)

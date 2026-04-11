@@ -19,12 +19,23 @@ from uuid import uuid4
 from backend.db.iris_client import iris_client
 from backend.db.redis_client import redis_client
 from backend.models import ScenarioAgentTrace, ScenarioSimulation
+from backend.pipeline.spatial_bundle import build_spatial_bundle
 from backend.simulation.scenario import run_scenario_swarm
 from backend.simulation.scenario_reasoner import reason_scenario_plan
 
 
 def _utcnow() -> datetime:
     return datetime.now(tz=timezone.utc)
+
+
+def _summarize_findings(findings) -> str:
+    """Compact summary of baseline safety findings for scenario prompt injection."""
+    if not findings:
+        return "No prior safety findings."
+    lines = ["Baseline safety findings:"]
+    for f in sorted(findings, key=lambda x: getattr(x, "compound_severity", 0), reverse=True)[:10]:
+        lines.append(f"  [{f.severity}] {f.room_id}: {f.label_text}")
+    return "\n".join(lines)
 
 
 def _resolve_facility_name(unit_id: str) -> str:
@@ -51,6 +62,16 @@ async def run_scenario_simulation(
     model = iris_client.get_model(unit_id)
     scene_graph = model.scene_graph_json
     facility_name = _resolve_facility_name(unit_id)
+
+    # Build (or reuse) canonical spatial bundle
+    spatial_bundle = model.spatial_bundle_json
+    if not spatial_bundle:
+        spatial_bundle = build_spatial_bundle(scene_graph)
+        iris_client.update_model(model.model_id, spatial_bundle_json=spatial_bundle)
+
+    # Gather latest baseline findings to annotate scenario prompts
+    baseline_findings = iris_client.list_findings(unit_id)
+    baseline_summary = _summarize_findings(baseline_findings)
 
     sim_id = simulation_id or f"sim_{uuid4().hex[:8]}"
     existing: ScenarioSimulation | None = iris_client.simulations.get(sim_id)
@@ -79,11 +100,20 @@ async def run_scenario_simulation(
             },
         )
 
+    # Augment the scenario prompt with spatial bundle summary + baseline findings
+    # so every role agent reasons over the annotated facility state.
+    from backend.agents.swarm import _bundle_text as _bt
+    augmented_prompt = (
+        f"{scenario_prompt}\n\n"
+        f"--- FACILITY SPATIAL CONTEXT ---\n{_bt(spatial_bundle)}\n\n"
+        f"--- KNOWN SAFETY ISSUES ---\n{baseline_summary}"
+    )
+
     try:
         aggregate = await run_scenario_swarm(
             scene_graph,
             facility_name,
-            scenario_prompt,
+            augmented_prompt,
             agents_per_role=agents_per_role,
             on_trace=publish_trace,
         )
