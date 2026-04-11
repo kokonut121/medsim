@@ -46,27 +46,29 @@ interface AgentPathDef extends AgentDef {
 
 // Paper plane geometry — parsed from docs/paper-plane-asset.obj (SketchUp export).
 // Vertices normalized to ~0.3 m wingspan, nose pointing +X, wings spread ±Z.
+// Y is negated from raw OBJ (SketchUp Y-up → Three.js Y-up after flip for correct orientation).
 const PLANE_S = 0.3;
 const PLANE_VERTS: Array<[number, number, number]> = (
   [
-    [-0.500, -0.054,  0.000],
-    [-0.500,  0.054,  0.018],
-    [ 0.500,  0.054,  0.000],  // nose tip
-    [-0.500,  0.054,  0.288],
-    [-0.500,  0.040,  0.036],
-    [-0.500,  0.054, -0.018],
-    [-0.500,  0.054, -0.288],
-    [-0.500,  0.040, -0.036],
+    [-0.500,  0.054,  0.000],  // v1 — keel tip (top in Three.js after negate)
+    [-0.500, -0.054,  0.018],  // v2
+    [ 0.500, -0.054,  0.000],  // v3 — nose tip
+    [-0.500, -0.054,  0.288],  // v4
+    [-0.500, -0.040,  0.036],  // v5
+    [-0.500, -0.054, -0.018],  // v6
+    [-0.500, -0.054, -0.288],  // v7
+    [-0.500, -0.040, -0.036],  // v8
   ] as Array<[number, number, number]>
-).map(([x, y, z]) => [x * PLANE_S, y * PLANE_S, z * PLANE_S]);
+).map(([x, y, z]) => [x * PLANE_S, y * PLANE_S - 0.02, z * PLANE_S]);
+//                                              ↑ shift model down so visual centre matches track height
 
 const PLANE_FACES: Array<{ vi: [number, number, number]; nx: number; ny: number; nz: number }> = [
-  { vi: [0, 1, 2], nx: -0.018, ny:  0.165, nz: -0.986 },
-  { vi: [1, 3, 2], nx:  0,     ny:  1,     nz:  0     },
-  { vi: [3, 4, 2], nx:  0.015, ny: -0.998, nz:  0.053 },
-  { vi: [5, 0, 2], nx: -0.018, ny:  0.165, nz:  0.986 },
-  { vi: [6, 5, 2], nx:  0,     ny:  1,     nz:  0     },
-  { vi: [2, 7, 6], nx:  0.015, ny: -0.998, nz: -0.053 },
+  { vi: [0, 1, 2], nx: -0.018, ny: -0.165, nz: -0.986 },
+  { vi: [1, 3, 2], nx:  0,     ny: -1,     nz:  0     },
+  { vi: [3, 4, 2], nx:  0.015, ny:  0.998, nz:  0.053 },
+  { vi: [5, 0, 2], nx: -0.018, ny: -0.165, nz:  0.986 },
+  { vi: [6, 5, 2], nx:  0,     ny: -1,     nz:  0     },
+  { vi: [2, 7, 6], nx:  0.015, ny:  0.998, nz: -0.053 },
 ];
 
 const PLANE_LIGHT = new THREE.Vector3(0.416, 0.832, 0.249); // above-right key light
@@ -637,16 +639,23 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
 
       for (const agent of agentPaths) {
         const dist = elapsedSeconds * agent.speed;
-        const worldPosition = interpolatePath(agent, dist, elapsedSeconds, agentVector);
+        // agentVector holds world position — must NOT be passed to projectToScreen
+        // before drawAgentPlane, because THREE.Vector3.project() mutates in-place.
+        interpolatePath(agent, dist, elapsedSeconds, agentVector);
         interpolatePath(agent, dist + 0.08, elapsedSeconds, aheadVector);
-        const travelDir = aheadVector.clone().sub(worldPosition);
+        const travelDir = aheadVector.clone().sub(agentVector);
 
-        const screenPosition = projectToScreen(worldPosition, viewer.camera, width, height);
+        // Draw 3D model first (needs world-space agentVector intact).
+        if (trailCtx) {
+          drawAgentPlane(trailCtx, agentVector, travelDir, agent.color, viewer.camera, width, height);
+        }
+
+        // projectToScreen mutates agentVector → only use screenPosition after this point.
+        const screenPosition = projectToScreen(agentVector, viewer.camera, width, height);
         const trailHistory = agentTrailHistoryRef.current[agent.id] ?? [];
         agentTrailHistoryRef.current[agent.id] = trailHistory;
         if (trailCtx) {
           drawAgentTrail(trailCtx, trailHistory, screenPosition, agent.color);
-          drawAgentPlane(trailCtx, worldPosition, travelDir, agent.color, viewer.camera, width, height);
         } else if (!screenPosition.visible) {
           trailHistory.length = 0;
         }
