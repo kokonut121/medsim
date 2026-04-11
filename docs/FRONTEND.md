@@ -21,7 +21,7 @@
 ## UI Priorities
 
 - The model page must preserve the 70/30 viewer-to-feed relationship on desktop.
+- Facility detail and model surfaces should always resolve to the newest world model available for each unit.
 - Findings should remain readable at a glance with domain, severity, room, and recommendation.
 - Coverage workflows must distinguish green covered zones from amber gaps.
 - Agent activity should remain visible during scan execution.
-

@@ -12,6 +12,10 @@ import { useSplatModel } from "@/hooks/useSplatModel";
 import { useStore } from "@/store";
 import type { Scan } from "@/types";
 
+function scanMatchesModel(scan: Scan | null, modelId: string | null | undefined): boolean {
+  return Boolean(scan && modelId && scan.model_id === modelId);
+}
+
 export function ModelClient({ unitId, initialScan }: { unitId: string; initialScan: Scan | null }) {
   const { findings, selectedFindingId, setFindings } = useStore(
     useShallow((state) => ({
@@ -21,27 +25,97 @@ export function ModelClient({ unitId, initialScan }: { unitId: string; initialSc
     })),
   );
   const { signedUrl, status, loading, error } = useSplatModel(unitId);
-  const triggeredScan = useRef(false);
+  const handledModelId = useRef<string | null>(null);
   const [scan, setScan] = useState<Scan | null>(initialScan);
 
   useScanStream(unitId);
 
   useEffect(() => {
-    if (status?.status !== "ready" || triggeredScan.current) {
+    if (status?.status !== "ready" || !status.model_id || handledModelId.current === status.model_id) {
       return;
     }
-    if (initialScan) {
-      setFindings(initialScan.findings);
-      setScan(initialScan);
-      triggeredScan.current = true;
-      return;
+    handledModelId.current = status.model_id;
+
+    let cancelled = false;
+    let timeoutId: number | undefined;
+
+    const schedulePoll = () => {
+      timeoutId = window.setTimeout(() => {
+        void syncScan();
+      }, 2000);
+    };
+
+    const syncScan = async () => {
+      try {
+        const latestScan = await api.getScanStatus(unitId);
+        if (cancelled || latestScan.model_id !== status.model_id) {
+          schedulePoll();
+          return;
+        }
+
+        setScan(latestScan);
+
+        if (latestScan.status === "complete") {
+          setFindings(latestScan.findings);
+          return;
+        }
+
+        if (latestScan.status !== "failed") {
+          schedulePoll();
+        }
+      } catch {
+        if (!cancelled) {
+          schedulePoll();
+        }
+      }
+    };
+
+    const matchingInitialScan = scanMatchesModel(initialScan, status.model_id) ? initialScan : null;
+
+    if (matchingInitialScan) {
+      setScan(matchingInitialScan);
+      if (matchingInitialScan.status === "complete") {
+        setFindings(matchingInitialScan.findings);
+        return () => {
+          cancelled = true;
+          if (timeoutId) {
+            window.clearTimeout(timeoutId);
+          }
+        };
+      }
+
+      setFindings([]);
+      void syncScan();
+      return () => {
+        cancelled = true;
+        if (timeoutId) {
+          window.clearTimeout(timeoutId);
+        }
+      };
     }
-    triggeredScan.current = true;
-    void api.runScan(unitId).then((nextScan) => {
-      setFindings(nextScan.findings);
-      setScan(nextScan);
-    });
-  }, [initialScan, setFindings, status?.status, unitId]);
+
+    setFindings([]);
+    void api.runScan(unitId)
+      .then((queuedScan) => {
+        if (cancelled) {
+          return;
+        }
+        setScan(queuedScan);
+        void syncScan();
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setScan(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [initialScan, setFindings, status?.model_id, status?.status, unitId]);
 
   const selectedLabel = useMemo(
     () => findings.find((finding) => finding.finding_id === selectedFindingId)?.label_text ?? null,

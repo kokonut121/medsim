@@ -178,6 +178,7 @@ async def run_scan_background(unit_id: str, scan_id: str) -> None:
     final_scan = Scan(
         scan_id=scan_id,
         unit_id=unit_id,
+        model_id=scan.model_id,
         status="complete",
         domain_statuses=domain_statuses,
         findings=findings,
@@ -252,9 +253,14 @@ def _rule_based_fallback(scan_id: str, model, bundle: dict) -> list[dict]:
 def create_scan(unit_id: str) -> Scan:
     """Create and persist a queued Scan. Returns immediately."""
     scan_id = f"scan_{uuid4().hex[:8]}"
+    try:
+        model_id = iris_client.get_model(unit_id).model_id
+    except KeyError:
+        model_id = None
     scan = Scan(
         scan_id=scan_id,
         unit_id=unit_id,
+        model_id=model_id,
         status="queued",
         domain_statuses={
             d: DomainStatus(status="queued", finding_count=0)

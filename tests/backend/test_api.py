@@ -66,6 +66,16 @@ def test_get_facility_detail(client):
     assert len(data["units"]) >= 1
 
 
+def test_get_facility_detail_returns_latest_model_first(client, fresh_iris):
+    newer_model = fresh_iris.create_or_replace_model("fac_demo", status="queued")
+
+    response = client.get("/api/facilities/fac_demo")
+
+    assert response.status_code == 200
+    models = [model for model in response.json()["models"] if model["unit_id"] == "unit_1"]
+    assert models[0]["model_id"] == newer_model.model_id
+
+
 def test_get_facility_coverage(client):
     r = client.get("/api/facilities/fac_demo/coverage")
     assert r.status_code == 200
@@ -232,8 +242,11 @@ def test_trigger_scan_endpoint(client):
     r = client.post("/api/scans/unit_1/run")
     assert r.status_code == 200
     data = r.json()
-    assert data["status"] == "complete"
+    assert data["status"] == "queued"
     assert data["unit_id"] == "unit_1"
+    assert data["model_id"] == "model_unit_1"
+    assert data["findings"] == []
+    assert data["completed_at"] is None
 
 
 def test_scan_status_endpoint_after_scan(client):

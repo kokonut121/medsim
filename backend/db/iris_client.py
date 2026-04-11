@@ -296,7 +296,11 @@ class MemoryIRISClient:
     def get_facility(self, facility_id: str) -> dict[str, Any]:
         facility = self.facilities[facility_id]
         units = [unit for unit in self.units.values() if unit.facility_id == facility_id]
-        models = [model for model in self.models.values() if model.unit_id in {unit.unit_id for unit in units}]
+        models = sorted(
+            [model for model in self.models.values() if model.unit_id in {unit.unit_id for unit in units}],
+            key=lambda model: model.created_at,
+            reverse=True,
+        )
         return {"facility": facility, "units": units, "models": models}
 
     def delete_facility(self, facility_id: str) -> None:
@@ -631,6 +635,7 @@ class NativeIRISClient:
             sharedmemory=settings.iris_sharedmemory,
         )
         self._iris = iris.createIRIS(self._connection)
+        self._verify_native_global_access()
         self._fhir_repository = FHIRRepositoryClient(
             base_url=settings.iris_fhir_base,
             username=settings.iris_user,
@@ -638,6 +643,18 @@ class NativeIRISClient:
         )
         self.upload_sessions: dict[str, dict[str, Any]] = {}
         self._seed_demo_data()
+
+    def _verify_native_global_access(self) -> None:
+        try:
+            self._iris.node("^MedSentinel.Bootstrap").get("namespace", None)
+        except RuntimeError as exc:
+            if "%Native_GlobalAccess" not in str(exc):
+                raise
+            raise RuntimeError(
+                "IRIS native mode connected successfully, but the configured service account lacks the "
+                "%Native_GlobalAccess resource. Re-run the MedSentinel IRIS bootstrap so the service role "
+                "is granted native global access."
+            ) from exc
 
     @property
     def facilities(self) -> dict[str, Facility]:
@@ -664,10 +681,21 @@ class NativeIRISClient:
         return self._load_models("MedSentinel.CoverageMap", CoverageMap)
 
     @property
+    def simulations(self) -> dict[str, ScenarioSimulation]:
+        return self._load_models("MedSentinel.ScenarioSimulation", ScenarioSimulation)
+
+    @property
     def findings_by_scan(self) -> defaultdict[str, list[Finding]]:
         grouped: defaultdict[str, list[Finding]] = defaultdict(list)
         for finding in self._load_models("MedSentinel.Finding", Finding).values():
             grouped[finding.scan_id].append(finding)
+        return grouped
+
+    @property
+    def simulations_by_unit(self) -> defaultdict[str, list[str]]:
+        grouped: defaultdict[str, list[str]] = defaultdict(list)
+        for simulation_id, simulation in self.simulations.items():
+            grouped[simulation.unit_id].append(simulation_id)
         return grouped
 
     @property
@@ -695,7 +723,7 @@ class NativeIRISClient:
         self._iris.node(global_name)[record_id] = json.dumps(payload)
 
     def _load_json(self, global_name: str, record_id: str) -> dict[str, Any] | None:
-        raw = self._iris.node(global_name).get(record_id)
+        raw = self._iris.node(global_name).get(record_id, None)
         if raw is None:
             return None
         return json.loads(raw)
@@ -757,7 +785,11 @@ class NativeIRISClient:
     def get_facility(self, facility_id: str) -> dict[str, Any]:
         facility = self.facilities[facility_id]
         units = [unit for unit in self.units.values() if unit.facility_id == facility_id]
-        models = [model for model in self.models.values() if model.unit_id in {unit.unit_id for unit in units}]
+        models = sorted(
+            [model for model in self.models.values() if model.unit_id in {unit.unit_id for unit in units}],
+            key=lambda model: model.created_at,
+            reverse=True,
+        )
         return {"facility": facility, "units": units, "models": models}
 
     def delete_facility(self, facility_id: str) -> None:
@@ -896,6 +928,23 @@ class NativeIRISClient:
         session.update(updates)
         return session
 
+    def write_scan(self, scan: Scan) -> Scan:
+        return self._store_model("MedSentinel.Scan", scan.scan_id, scan)
+
+    def get_scan(self, scan_id: str) -> Scan:
+        scan = self._load_json("MedSentinel.Scan", scan_id)
+        if scan is None:
+            raise KeyError(scan_id)
+        return Scan.model_validate(scan)
+
+    def update_scan_status(self, scan_id: str, status: str) -> Scan | None:
+        scan = self._load_json("MedSentinel.Scan", scan_id)
+        if scan is None:
+            return None
+        scan["status"] = status
+        updated = Scan.model_validate(scan)
+        return self._store_model("MedSentinel.Scan", scan_id, updated)
+
     def write_findings(self, scan: Scan, findings: list[Finding]) -> Scan:
         stored_scan = scan.model_copy(update={"findings": findings})
         for finding in findings:
@@ -940,6 +989,34 @@ class NativeIRISClient:
         if not models:
             raise KeyError(unit_id)
         return sorted(models, key=lambda item: item.created_at)[-1]
+
+    def write_simulation(self, sim: ScenarioSimulation) -> ScenarioSimulation:
+        return self._store_model("MedSentinel.ScenarioSimulation", sim.simulation_id, sim)
+
+    def update_simulation(self, simulation_id: str, **updates: object) -> ScenarioSimulation:
+        simulation = self._load_json("MedSentinel.ScenarioSimulation", simulation_id)
+        if simulation is None:
+            raise KeyError(simulation_id)
+        for key, value in updates.items():
+            simulation[key] = value
+        updated = ScenarioSimulation.model_validate(simulation)
+        return self._store_model("MedSentinel.ScenarioSimulation", simulation_id, updated)
+
+    def get_simulation(self, simulation_id: str) -> ScenarioSimulation:
+        simulation = self._load_json("MedSentinel.ScenarioSimulation", simulation_id)
+        if simulation is None:
+            raise KeyError(simulation_id)
+        return ScenarioSimulation.model_validate(simulation)
+
+    def list_simulations(self, unit_id: str) -> list[ScenarioSimulation]:
+        simulations = [simulation for simulation in self.simulations.values() if simulation.unit_id == unit_id]
+        return sorted(simulations, key=lambda item: item.triggered_at, reverse=True)
+
+    def get_latest_simulation(self, unit_id: str) -> ScenarioSimulation:
+        simulations = self.list_simulations(unit_id)
+        if not simulations:
+            raise KeyError(unit_id)
+        return simulations[0]
 
     def get_diagnostic_report_resource(self, scan_id: str) -> dict[str, Any]:
         scan = self.scans.get(scan_id)

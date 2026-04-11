@@ -24,14 +24,7 @@ async def trigger_scan(unit_id: str, background_tasks: BackgroundTasks) -> dict:
 
     scan = create_scan(unit_id)
     background_tasks.add_task(run_scan_background, unit_id, scan.scan_id)
-
-    return {
-        "scan_id": scan.scan_id,
-        "unit_id": unit_id,
-        "status": "queued",
-        "domain_statuses": {d: s.model_dump() for d, s in scan.domain_statuses.items()},
-        "triggered_at": scan.triggered_at.isoformat(),
-    }
+    return scan.model_dump(mode="json")
 
 
 @router.get("/{unit_id}/status")

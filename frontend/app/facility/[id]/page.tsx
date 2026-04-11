@@ -5,6 +5,16 @@ import { BackLink } from "@/components/ui/BackLink";
 import { api } from "@/lib/api";
 import type { WorldModel } from "@/types";
 
+function latestModelForUnit(models: WorldModel[], unitId: string): WorldModel | null {
+  const matches = models.filter((model) => model.unit_id === unitId);
+  if (!matches.length) {
+    return null;
+  }
+  return matches.sort(
+    (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
+  )[0];
+}
+
 function ModelInfoCard({ model }: { model: WorldModel | null }) {
   if (!model) {
     return (
@@ -66,7 +76,7 @@ export default async function FacilityDetailPage({ params }: { params: Promise<{
       <div style={{ height: 20 }} />
       <div className="card-grid">
         {data.units.map((unit) => {
-          const latestModel = data.models.find((m) => m.unit_id === unit.unit_id) ?? null;
+          const latestModel = latestModelForUnit(data.models, unit.unit_id);
 
           return (
             <div className="feed-card" key={unit.unit_id}>

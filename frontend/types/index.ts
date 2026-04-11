@@ -28,6 +28,7 @@ export interface Finding {
 export interface Scan {
   scan_id: string;
   unit_id: string;
+  model_id: string | null;
   status: "queued" | "running" | "synthesizing" | "complete" | "failed";
   domain_statuses: Record<Domain, { status: string; finding_count: number }>;
   findings: Finding[];

@@ -46,6 +46,7 @@ class DomainStatus(BaseModel):
 class Scan(BaseModel):
     scan_id: str
     unit_id: str
+    model_id: str | None = None
     status: ScanStatus
     domain_statuses: dict[Domain, DomainStatus]
     findings: list[Finding]
