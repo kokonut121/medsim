@@ -16,13 +16,9 @@ async function parse<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
   let response: Response;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
-
   try {
     response = await fetch(url, {
       ...init,
-      signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
         ...(init?.headers ?? {})
@@ -34,8 +30,6 @@ async function parse<T>(path: string, init?: RequestInit): Promise<T> {
       `Unable to reach MedSentinel backend at ${API_BASE}. Start the FastAPI server with \`./scripts/start-backend.sh\` from the repo root and retry.`,
       { cause: error }
     );
-  } finally {
-    clearTimeout(timeout);
   }
 
   if (!response.ok) {

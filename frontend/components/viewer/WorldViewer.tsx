@@ -463,10 +463,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
       .then((r) => (r.ok ? r.json() : null))
       .then((sg: Record<string, unknown> | null) => {
         if (cancelled || !sg) return;
-        const units = (sg.units as Array<Record<string, unknown>>) ?? [];
-        const rooms: Array<Record<string, unknown>> = units.flatMap(
-          (u) => (u.rooms as Array<Record<string, unknown>>) ?? []
-        );
+        const rooms = (sg.rooms as Array<Record<string, unknown>>) ?? [];
         setAgentPaths(buildAgentPaths(rooms));
         setFloorRooms(rooms.map((r) => ({
           id: r.room_id as string,

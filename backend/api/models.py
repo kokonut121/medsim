@@ -37,8 +37,6 @@ async def get_splat(unit_id: str):
     if model.status != "ready":
         raise HTTPException(status_code=409, detail=f"Model is {model.status}")
     if settings.use_synthetic_fallbacks or not settings.r2_account_id:
-        if model.world_marble_url:
-            return {"unit_id": unit_id, "signed_url": model.world_marble_url}
         raise HTTPException(status_code=404, detail="No splat asset available")
     if not model.splat_r2_key:
         raise HTTPException(status_code=404, detail="Model asset not found")
