@@ -44,6 +44,91 @@ interface AgentPathDef extends AgentDef {
   totalLength: number;
 }
 
+// Paper plane geometry — parsed from docs/paper-plane-asset.obj (SketchUp export).
+// Vertices normalized to ~0.3 m wingspan, nose pointing +X, wings spread ±Z.
+const PLANE_S = 0.3;
+const PLANE_VERTS: Array<[number, number, number]> = (
+  [
+    [-0.500, -0.054,  0.000],
+    [-0.500,  0.054,  0.018],
+    [ 0.500,  0.054,  0.000],  // nose tip
+    [-0.500,  0.054,  0.288],
+    [-0.500,  0.040,  0.036],
+    [-0.500,  0.054, -0.018],
+    [-0.500,  0.054, -0.288],
+    [-0.500,  0.040, -0.036],
+  ] as Array<[number, number, number]>
+).map(([x, y, z]) => [x * PLANE_S, y * PLANE_S, z * PLANE_S]);
+
+const PLANE_FACES: Array<{ vi: [number, number, number]; nx: number; ny: number; nz: number }> = [
+  { vi: [0, 1, 2], nx: -0.018, ny:  0.165, nz: -0.986 },
+  { vi: [1, 3, 2], nx:  0,     ny:  1,     nz:  0     },
+  { vi: [3, 4, 2], nx:  0.015, ny: -0.998, nz:  0.053 },
+  { vi: [5, 0, 2], nx: -0.018, ny:  0.165, nz:  0.986 },
+  { vi: [6, 5, 2], nx:  0,     ny:  1,     nz:  0     },
+  { vi: [2, 7, 6], nx:  0.015, ny: -0.998, nz: -0.053 },
+];
+
+const PLANE_LIGHT = new THREE.Vector3(0.416, 0.832, 0.249); // above-right key light
+const PLANE_NOSE = new THREE.Vector3(1, 0, 0);
+const _pq = new THREE.Quaternion();
+const _pv = new THREE.Vector3();
+const _pn = new THREE.Vector3();
+
+function drawAgentPlane(
+  ctx: CanvasRenderingContext2D,
+  worldPos: THREE.Vector3,
+  travelDir: THREE.Vector3,
+  color: string,
+  camera: THREE.PerspectiveCamera,
+  width: number,
+  height: number,
+): void {
+  const dir = _pv.copy(travelDir).setY(0);
+  if (dir.lengthSq() > 0.0001) {
+    _pq.setFromUnitVectors(PLANE_NOSE, dir.normalize());
+  } else {
+    _pq.identity();
+  }
+
+  // transform verts to world space
+  const wv = PLANE_VERTS.map(([lx, ly, lz]) =>
+    new THREE.Vector3(lx, ly, lz).applyQuaternion(_pq).add(worldPos),
+  );
+  const sv = wv.map((v) => projectToScreen(v, camera, width, height));
+  if (!sv.some((s) => s.visible)) return;
+
+  // painter's sort — depth in camera space
+  const camInv = camera.matrixWorldInverse;
+  const sorted = PLANE_FACES.map((face) => {
+    const z = face.vi.reduce((s, i) => s + new THREE.Vector3().copy(wv[i]).applyMatrix4(camInv).z, 0) / 3;
+    return { face, z };
+  }).sort((a, b) => a.z - b.z);
+
+  const ri = parseInt(color.slice(1, 3), 16);
+  const gi = parseInt(color.slice(3, 5), 16);
+  const bi = parseInt(color.slice(5, 7), 16);
+
+  ctx.globalAlpha = 0.93;
+  for (const { face } of sorted) {
+    const [i0, i1, i2] = face.vi;
+    if (!sv[i0].visible && !sv[i1].visible && !sv[i2].visible) continue;
+    _pn.set(face.nx, face.ny, face.nz).applyQuaternion(_pq);
+    const br = Math.max(0, _pn.dot(PLANE_LIGHT)) * 0.65 + 0.35;
+    ctx.beginPath();
+    ctx.moveTo(sv[i0].x, sv[i0].y);
+    ctx.lineTo(sv[i1].x, sv[i1].y);
+    ctx.lineTo(sv[i2].x, sv[i2].y);
+    ctx.closePath();
+    ctx.fillStyle = `rgb(${Math.round(ri * br)},${Math.round(gi * br)},${Math.round(bi * br)})`;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
 const TARGET_OVERLAY_FPS = 30;
 const LIVE_FINDINGS_LIMIT = 5;
 // ~2 seconds of motion at TARGET_OVERLAY_FPS — length of the dotted contrail.
@@ -523,6 +608,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
     startTimeRef.current = performance.now();
     const annotationVector = new THREE.Vector3();
     const agentVector = new THREE.Vector3();
+    const aheadVector = new THREE.Vector3();
     let lastPaint = 0;
 
     const tick = (now: number) => {
@@ -550,22 +636,17 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
       const elapsedSeconds = (now - startTimeRef.current) / 1000;
 
       for (const agent of agentPaths) {
-        const worldPosition = interpolatePath(
-          agent,
-          elapsedSeconds * agent.speed,
-          elapsedSeconds,
-          agentVector,
-        );
+        const dist = elapsedSeconds * agent.speed;
+        const worldPosition = interpolatePath(agent, dist, elapsedSeconds, agentVector);
+        interpolatePath(agent, dist + 0.08, elapsedSeconds, aheadVector);
+        const travelDir = aheadVector.clone().sub(worldPosition);
+
         const screenPosition = projectToScreen(worldPosition, viewer.camera, width, height);
-        updateProjectedElement(
-          agentRefs.current[agent.id],
-          screenPosition,
-          "none",
-        );
         const trailHistory = agentTrailHistoryRef.current[agent.id] ?? [];
         agentTrailHistoryRef.current[agent.id] = trailHistory;
         if (trailCtx) {
           drawAgentTrail(trailCtx, trailHistory, screenPosition, agent.color);
+          drawAgentPlane(trailCtx, worldPosition, travelDir, agent.color, viewer.camera, width, height);
         } else if (!screenPosition.visible) {
           trailHistory.length = 0;
         }
@@ -701,26 +782,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
         })}
 
         {agentPaths.map((agent) => (
-          <div
-            key={agent.id}
-            ref={(node) => { agentRefs.current[agent.id] = node; }}
-            className="agent-marker"
-            title={agent.role}
-            style={{ color: agent.color, opacity: 0, visibility: "hidden" }}
-          >
-            <svg viewBox="0 0 44 40" width="44" height="40" className="agent-fish">
-              {/* left wing — top face, full brightness */}
-              <polygon points="22,2 0,26 22,26" fill="currentColor" />
-              {/* right wing — angled away, slightly dimmer */}
-              <polygon points="22,2 44,22 22,26" fill="currentColor" opacity="0.65" />
-              {/* fuselage front face */}
-              <rect x="16" y="26" width="12" height="12" rx="1" fill="currentColor" opacity="0.9" />
-              {/* fuselage right side — gives the 3D box depth */}
-              <polygon points="28,26 36,22 36,32 28,38" fill="currentColor" opacity="0.38" />
-              {/* center fold crease */}
-              <line x1="22" y1="2" x2="22" y2="38" stroke="white" strokeWidth="0.8" opacity="0.3" />
-            </svg>
-          </div>
+          <div key={agent.id} ref={(node) => { agentRefs.current[agent.id] = node; }} />
         ))}
       </div>
 
