@@ -77,7 +77,7 @@ export default async function FacilityDetailPage({ params }: { params: Promise<{
               <ModelInfoCard model={latestModel} />
               <div style={{ height: 16 }} />
               <div className="cta-row">
-                <Link className="button" href="/">
+                <Link className="button" href={`/facility/${id}/model/${unit.unit_id}` as Route}>
                   Open model
                 </Link>
                 <Link className="button secondary" href={`/facility/${id}/simulation/${unit.unit_id}` as Route}>
