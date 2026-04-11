@@ -263,6 +263,82 @@ function buildAgentPaths(rooms: Array<Record<string, unknown>>): AgentPathDef[] 
   });
 }
 
+// Corridor spine — used as approach/retreat waypoints between annotation visits
+const CORRIDOR_SPINE: Array<[number, number, number]> = [
+  [0.5, 1.1, -1.75],
+  [0.5, 1.1,  1.75],
+  [0.5, 1.1,  5.25],
+  [0.5, 1.1,  8.75],
+  [0.5, 1.1, 12.25],
+];
+
+// Domain → agent index (matches AGENT_ROLES order)
+const DOMAIN_AGENT: Record<string, number> = {
+  ICA: 0, FRA: 1, SCA: 2, ERA: 3, MSA: 4, PFA: 2,
+};
+
+function buildAnnotationPaths(annotations: AnnotationDef[]): AgentPathDef[] {
+  // Bucket annotations by assigned agent
+  const buckets: AnnotationDef[][] = AGENT_ROLES.map(() => []);
+  for (const ann of annotations) {
+    const idx = DOMAIN_AGENT[ann.domain] ?? 0;
+    buckets[idx].push(ann);
+  }
+
+  return AGENT_ROLES.map((roleInfo, i) => {
+    const myAnns = buckets[i];
+
+    let path: Array<[number, number, number]>;
+    if (myAnns.length === 0) {
+      // No findings for this agent — fall back to corridor patrol
+      path = [...CORRIDOR_SPINE, CORRIDOR_SPINE[0]];
+    } else {
+      // Sort annotations by Z so agent moves along corridor direction
+      const sorted = [...myAnns].sort((a, b) => a.worldPos[2] - b.worldPos[2]);
+      path = [];
+      for (const ann of sorted) {
+        // Find nearest corridor spine point as approach waypoint
+        const approach = CORRIDOR_SPINE.reduce((best, wp) =>
+          Math.abs(wp[2] - ann.worldPos[2]) < Math.abs(best[2] - ann.worldPos[2]) ? wp : best,
+        );
+        path.push(approach);
+        // Step into the room toward the finding
+        path.push([ann.worldPos[0], roleInfo.cruiseHeight, ann.worldPos[2]]);
+        // Return to corridor
+        path.push(approach);
+      }
+      // Close the loop back to start
+      path.push(CORRIDOR_SPINE[0]);
+    }
+
+    const segmentLengths: number[] = [];
+    let totalLength = 0;
+    for (let j = 0; j < path.length - 1; j++) {
+      const len = Math.hypot(
+        path[j + 1][0] - path[j][0],
+        path[j + 1][1] - path[j][1],
+        path[j + 1][2] - path[j][2],
+      );
+      segmentLengths.push(len);
+      totalLength += len;
+    }
+
+    return {
+      id: `${roleInfo.role}-${i + 1}`,
+      role: roleInfo.role,
+      color: roleInfo.color,
+      speed: roleInfo.speed,
+      cruiseHeight: roleInfo.cruiseHeight,
+      bobAmplitude: roleInfo.bobAmplitude,
+      bobRate: roleInfo.bobRate,
+      bobPhase: roleInfo.bobPhase,
+      path,
+      segmentLengths,
+      totalLength: totalLength || 1,
+    };
+  });
+}
+
 function projectToScreen(
   vector: THREE.Vector3,
   camera: THREE.PerspectiveCamera,
@@ -483,6 +559,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
   const [annotations, setAnnotations] = useState<AnnotationDef[]>([]);
   const [agentPaths, setAgentPaths] = useState<AgentPathDef[]>([]);
   const [floorRooms, setFloorRooms] = useState<Array<{ id: string; type: string; col: number; row: number }>>([]);
+  const roomsRef = useRef<Array<Record<string, unknown>>>([]);
 
   const isIframeUrl = splatUrl.startsWith("https://marble.worldlabs.ai");
   const noModel = splatUrl === "";
@@ -542,6 +619,8 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
             };
           });
           setAnnotations(defs);
+          // Route agents to their assigned findings
+          setAgentPaths(buildAnnotationPaths(defs));
         })
         .catch(() => null);
 
@@ -561,7 +640,10 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
       .then((r) => (r.ok ? r.json() : null))
       .then((sg: Record<string, unknown> | null) => {
         if (cancelled || !sg) return;
-        const rooms = (sg.rooms as Array<Record<string, unknown>>) ?? [];
+        const rooms = (sg.units as Array<{rooms?: Array<Record<string, unknown>>}>)?.[0]?.rooms
+          ?? (sg.rooms as Array<Record<string, unknown>>) ?? [];
+        roomsRef.current = rooms;
+        // Use corridor patrol as initial paths; overridden once annotations load
         setAgentPaths(buildAgentPaths(rooms));
         setFloorRooms(rooms.map((r) => ({
           id: r.room_id as string,
