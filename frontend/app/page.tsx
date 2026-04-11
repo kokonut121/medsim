@@ -1,6 +1,6 @@
 import { WorldViewer } from "@/components/viewer/WorldViewer";
 import { buildApiUrl } from "@/lib/runtime";
-import { getFallbackSplatUrl, resolveSplatAssetUrl } from "@/lib/splat";
+import { resolveSplatAssetUrl } from "@/lib/splat";
 
 async function getSplatUrl(): Promise<string> {
   try {
