@@ -45,7 +45,7 @@ async def get_splat(unit_id: str):
     return {
         "unit_id": unit_id,
         "signed_url": public_url,
-        "stream_url": f"/api/models/{unit_id}/splat/stream",
+        "stream_url": f"/api/models/{unit_id}/splat/stream?v={model.world_labs_world_id or model.model_id}",
     }
 
 
