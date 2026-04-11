@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import mimetypes
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
@@ -13,13 +14,76 @@ from backend.db.r2_client import r2_client
 
 
 UTC = timezone.utc
+# World Labs multi-image reconstruction mode supports up to 8 images.
+# Keep the cap aligned with the public API contract so long walkthroughs
+# are evenly sampled without triggering request validation errors.
+PROMPT_IMAGE_LIMIT = 8
+
+
+def _sample_evenly(images: list[dict], limit: int) -> list[dict]:
+    if limit <= 0 or not images:
+        return []
+    if len(images) <= limit:
+        return list(images)
+    if limit == 1:
+        return [images[len(images) // 2]]
+
+    step = (len(images) - 1) / (limit - 1)
+    selected: list[dict] = []
+    used_indices: set[int] = set()
+
+    for slot in range(limit):
+        idx = round(slot * step)
+        if idx in used_indices:
+            for candidate in range(len(images)):
+                if candidate not in used_indices:
+                    idx = candidate
+                    break
+        used_indices.add(idx)
+        selected.append(images[idx])
+
+    return selected
+
+
+def _remaining_images(images: list[dict], chosen: list[dict]) -> list[dict]:
+    chosen_object_ids = {id(image) for image in chosen}
+    return [image for image in images if id(image) not in chosen_object_ids]
 
 
 def _pick_prompt_images(images: list[dict]) -> list[dict]:
-    places = [image for image in images if image["source"] == "places"]
-    street = [image for image in images if image["source"] == "street_view"]
-    selected = (places[:4] or street[:4] or images[:4])[:4]
-    return selected
+    if len(images) <= PROMPT_IMAGE_LIMIT:
+        return list(images)
+
+    sources = {
+        "vr_video": [image for image in images if image.get("source") == "vr_video"],
+        "supplemental_upload": [image for image in images if image.get("source") == "supplemental_upload"],
+        "places": [image for image in images if image.get("source") == "places"],
+        "street_view": [image for image in images if image.get("source") == "street_view"],
+    }
+
+    selected: list[dict] = []
+
+    capture_heavy = sources["vr_video"] + sources["supplemental_upload"]
+    if capture_heavy:
+        # Walkthrough videos and targeted uploads benefit most from broader,
+        # evenly spaced coverage across the full sequence rather than a tiny
+        # front-loaded subset.
+        selected.extend(_sample_evenly(capture_heavy, min(PROMPT_IMAGE_LIMIT, len(capture_heavy))))
+    else:
+        places_quota = min(len(sources["places"]), math.ceil(PROMPT_IMAGE_LIMIT * 0.67))
+        selected.extend(_sample_evenly(sources["places"], places_quota))
+
+        street_quota = min(
+            len(sources["street_view"]),
+            max(0, PROMPT_IMAGE_LIMIT - len(selected)),
+        )
+        selected.extend(_sample_evenly(sources["street_view"], street_quota))
+
+    remaining_slots = PROMPT_IMAGE_LIMIT - len(selected)
+    if remaining_slots > 0:
+        selected.extend(_sample_evenly(_remaining_images(images, selected), remaining_slots))
+
+    return selected[:PROMPT_IMAGE_LIMIT]
 
 
 def _world_prompt_from_images(images: list[dict], scene_graph: dict) -> dict:
@@ -39,6 +103,29 @@ def _world_prompt_from_images(images: list[dict], scene_graph: dict) -> dict:
         "multi_image_prompt": prompt_images,
         "text_prompt": f"Hospital trauma center environment reconstructed from public imagery. Scene context: {scene_summary}",
     }
+
+
+def _response_error_detail(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        body = response.text.strip()
+        return body or f"HTTP {response.status_code}"
+
+    if isinstance(payload, dict):
+        detail = payload.get("detail")
+        if isinstance(detail, str):
+            return detail
+        if isinstance(detail, list):
+            return json.dumps(detail)[:1000]
+        error = payload.get("error")
+        if isinstance(error, dict):
+            message = error.get("message")
+            if isinstance(message, str) and message:
+                return message
+        return json.dumps(payload)[:1000]
+
+    return str(payload)[:1000]
 
 
 async def _poll_world_completion(client: httpx.AsyncClient, operation_id: str, api_key: str, api_base: str) -> dict:
@@ -119,6 +206,9 @@ async def generate_world_model(images: list[dict], scene_graph: dict, *, facilit
                 "caption": f"World Labs quota exceeded — synthetic fallback (real images acquired: {len(images)})",
                 "world_marble_url": None,
             }
+        if start.status_code == 400:
+            detail = _response_error_detail(start)
+            raise RuntimeError(f"World Labs rejected the generation request: {detail}")
         start.raise_for_status()
         operation = start.json()
         operation_id = operation["operation_id"]

@@ -14,6 +14,7 @@ immediately with a model_id the client can poll via
   GET /api/models/{unit_id}/status
 """
 
+import asyncio
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -21,7 +22,7 @@ from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, Uplo
 
 from backend.db.iris_client import iris_client
 from backend.db.r2_client import r2_client
-from backend.jobs.acquire_images import _image_key
+from backend.jobs.acquire_images import _fal_public_url, _image_key, _store_fal_image
 from backend.models import ImageMeta
 from backend.pipeline.classify import classify_image
 from backend.pipeline.coverage import build_coverage_from_images
@@ -33,6 +34,19 @@ router = APIRouter(prefix="/api/video", tags=["video"])
 UTC = timezone.utc
 
 
+def _store_video_frame(key: str, payload: bytes, *, content_type: str) -> str:
+    """
+    Persist an extracted walkthrough frame and return a fetchable public URL.
+
+    Uses R2 when configured, otherwise falls back to the same local asset path
+    used by the fal.ai image helpers so local development remains functional.
+    """
+    _store_fal_image(key, payload, content_type)
+    if r2_client.enabled:
+        return r2_client.public_url_for(key)
+    return _fal_public_url(key)
+
+
 async def _process_video(
     facility_id: str,
     model_id: str,
@@ -42,11 +56,12 @@ async def _process_video(
 ) -> None:
     """Background task: extract → classify → scene graph → world model."""
     try:
-        iris_client.update_model(model_id, status="extracting")
+        iris_client.update_model(model_id, status="acquiring", failure_reason="")
         facility = iris_client.facilities[facility_id]
 
         # 1. Extract frames from video
-        frames = extract_frames(
+        frames = await asyncio.to_thread(
+            extract_frames,
             video_bytes,
             max_frames=max_frames,
             equirect_crops=equirect_crops,
@@ -57,18 +72,23 @@ async def _process_video(
         summary = extract_summary(frames)
         iris_client.update_model(model_id, status="classifying", source_image_count=summary["count"])
 
-        # 2. Upload to R2 + store ImageMeta
+        # 2. Persist extracted frames + store ImageMeta
         uploaded: list[dict] = []
         for i, frame in enumerate(frames, start=1):
             key = _image_key(facility_id, "vr_video", frame["file_name"])
-            r2_client.upload_bytes(key, frame["bytes"], content_type="image/jpeg")
+            public_url = await asyncio.to_thread(
+                _store_video_frame,
+                key,
+                frame["bytes"],
+                content_type="image/jpeg",
+            )
             meta = iris_client.write_image_meta(
                 ImageMeta(
                     image_id=f"img_{uuid4().hex[:8]}",
                     facility_id=facility_id,
                     source="vr_video",
                     r2_key=key,
-                    public_url=r2_client.public_url_for(key),
+                    public_url=public_url,
                     heading=frame.get("heading"),
                     content_type="image/jpeg",
                     created_at=datetime.now(tz=UTC),
@@ -78,7 +98,6 @@ async def _process_video(
                               "public_url": meta.public_url, "index": i})
 
         # 3. Classify all frames in parallel
-        import asyncio
         classified = await asyncio.gather(
             *[classify_image(f["bytes"], "vr_video", {"heading": f.get("heading"), "index": f["index"]})
               for f in uploaded]
