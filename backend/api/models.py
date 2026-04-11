@@ -96,3 +96,15 @@ async def stream_splat(unit_id: str):
 @router.get("/{unit_id}/scene_graph")
 async def get_scene_graph(unit_id: str):
     return iris_client.get_model(unit_id).scene_graph_json
+
+
+@router.get("/{unit_id}/spatial_bundle")
+async def get_spatial_bundle(unit_id: str):
+    """Return the canonical spatial bundle (rooms, nav_edges, zone_tags, anchors)."""
+    from backend.pipeline.spatial_bundle import build_spatial_bundle
+    model = iris_client.get_model(unit_id)
+    bundle = model.spatial_bundle_json
+    if not bundle:
+        bundle = build_spatial_bundle(model.scene_graph_json)
+    # Strip room_index — it's an internal lookup dict, not needed by the client
+    return {k: v for k, v in bundle.items() if k != "room_index"}
