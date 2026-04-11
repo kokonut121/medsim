@@ -27,7 +27,7 @@ Built for **Harvard's HSIL Hackathon**. MedSim automatically acquires public ima
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Layer 0: InterSystems IRIS for Health                          │
-│  (Secure Wallet · FHIR R4 · RBAC · Audit Log · IntegratedML)   │
+│  (Secure Wallet · FHIR R4 · RBAC · Audit Log · IntegratedML)    │
 ├──────────────┬──────────────────────────┬───────────────────────┤
 │  Layer 1     │  Layer 2                 │  Layer 3              │
 │  Image       │  World Model Pipeline    │  Agent Orchestration  │
@@ -38,7 +38,7 @@ Built for **Harvard's HSIL Hackathon**. MedSim automatically acquires public ima
 │  OSM         │  → Cloudflare R2         │                       │
 ├──────────────┴──────────────────────────┴───────────────────────┤
 │  Layer 4: Frontend                                              │
-│  Next.js 15 · Mapbox · React Three Fiber · Gaussian Splats 3D  │
+│  Next.js 15 · Mapbox · React Three Fiber · Gaussian Splats 3D   │
 │  Zustand · WebSockets · Recharts                                │
 └─────────────────────────────────────────────────────────────────┘
 ```
