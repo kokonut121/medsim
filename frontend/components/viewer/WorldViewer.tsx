@@ -44,21 +44,6 @@ interface AgentPathDef extends AgentDef {
   totalLength: number;
 }
 
-const SKETCHFAB_MODEL_ID = "5edb97c206ae4ad2a022bfef354561cc";
-const SKETCHFAB_SRC = `https://sketchfab.com/models/${SKETCHFAB_MODEL_ID}/embed?autostart=1&animation_autoplay=1&ui_controls=0&ui_infos=0&ui_watermark=0&ui_stop=0&preload=1`;
-
-function hexToHue(hex: string): number {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const d = max - min;
-  if (d === 0) return 0;
-  let h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  return Math.round(h * 60);
-}
-
 const TARGET_OVERLAY_FPS = 30;
 const LIVE_FINDINGS_LIMIT = 5;
 // ~2 seconds of motion at TARGET_OVERLAY_FPS — length of the dotted contrail.
@@ -723,13 +708,14 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
             title={agent.role}
             style={{ color: agent.color, opacity: 0, visibility: "hidden" }}
           >
-            <iframe
-              src={SKETCHFAB_SRC}
-              className="agent-sketchfab"
-              style={{ filter: `hue-rotate(${hexToHue(agent.color)}deg) saturate(1.8)` }}
-              allow="autoplay"
-              title={agent.role}
-            />
+            <svg viewBox="0 0 40 28" width="40" height="28" className="agent-fish">
+              {/* main wing */}
+              <polygon points="38,14 0,2 10,14" fill="currentColor" />
+              {/* lower wing */}
+              <polygon points="38,14 0,26 10,14" fill="currentColor" opacity="0.6" />
+              {/* fold crease */}
+              <line x1="10" y1="14" x2="38" y2="14" stroke="white" strokeWidth="0.8" opacity="0.4" />
+            </svg>
           </div>
         ))}
       </div>

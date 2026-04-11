@@ -1041,21 +1041,23 @@ tr:hover td {
   font-weight: 300;
 }
 
-/* ═ Swarm agents (Sketchfab embed) ═ */
+/* ═ Swarm agents ═ */
 .agent-marker {
   position: absolute;
-  width: 72px;
-  height: 96px;
+  width: 40px;
+  height: 28px;
   pointer-events: none;
   will-change: transform, opacity;
 }
 
-.agent-sketchfab {
-  width: 100%;
-  height: 100%;
-  border: none;
-  pointer-events: none;
-  background: transparent;
+.agent-fish {
+  filter: drop-shadow(0 0 4px currentColor);
+  animation: agent-bob 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes agent-bob {
+  from { transform: translateY(-2px) rotate(-2deg); }
+  to   { transform: translateY(2px)  rotate(2deg);  }
 }
 
 .agent-trail-canvas {
