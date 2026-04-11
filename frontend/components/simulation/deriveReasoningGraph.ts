@@ -31,12 +31,12 @@ export function deriveReasoningGraph(
       role_kind: trace.kind,
       room_id: trace.focus_room_id,
       parent_id: null,
-      emphasis: trace.challenges.some((item) => item.blocking) ? "high" : "medium",
-      detail: trace.notes || trace.actions.slice(0, 2).join(", "),
+      emphasis: (trace.challenges ?? []).some((item) => item.blocking) ? "high" : "medium",
+      detail: trace.notes || (trace.actions ?? []).slice(0, 2).join(", "),
       revealed_at_step: traces.length
     });
 
-    trace.tasks.slice(0, 4).forEach((task) => {
+    (trace.tasks ?? []).slice(0, 4).forEach((task) => {
       const taskId = `${trace.agent_id}:task:${task.task_id}`;
       nodes.push({
         id: taskId,
@@ -60,7 +60,7 @@ export function deriveReasoningGraph(
       });
     });
 
-    trace.challenges.slice(0, 4).forEach((challenge) => {
+    (trace.challenges ?? []).slice(0, 4).forEach((challenge) => {
       const challengeId = `${trace.agent_id}:challenge:${challenge.challenge_id}`;
       nodes.push({
         id: challengeId,
@@ -84,7 +84,7 @@ export function deriveReasoningGraph(
       });
     });
 
-    trace.handoffs.slice(0, 4).forEach((handoff, index) => {
+    (trace.handoffs ?? []).slice(0, 4).forEach((handoff, index) => {
       let targetId = handoff.target_agent_id;
       if (!targetId && handoff.target_kind) {
         targetId = `role:${handoff.target_kind}`;
