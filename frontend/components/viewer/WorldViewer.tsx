@@ -27,6 +27,10 @@ interface AgentDef {
   color: string;
   path: Array<[number, number, number]>;
   speed: number;
+  cruiseHeight: number;
+  bobAmplitude: number;
+  bobRate: number;
+  bobPhase: number;
 }
 
 interface ScreenPos {
@@ -42,6 +46,7 @@ interface AgentPathDef extends AgentDef {
 
 const TARGET_OVERLAY_FPS = 30;
 const LIVE_FINDINGS_LIMIT = 5;
+const AGENT_TRAIL_PARTICLES = 6;
 const UNIT_ID = "unit_1";
 
 // Grid → world coordinate mapping (must match backend team_utils.py)
@@ -49,16 +54,16 @@ const GRID_SCALE = 0.8;
 const COL_ORIGIN = 2.0;
 const ROW_ORIGIN = 1.5;
 
-function gridToWorld(col: number, row: number): [number, number, number] {
-  return [(col - COL_ORIGIN) * GRID_SCALE, 1.0, (row - ROW_ORIGIN) * GRID_SCALE];
+function gridToWorld(col: number, row: number, height = 1.0): [number, number, number] {
+  return [(col - COL_ORIGIN) * GRID_SCALE, height, (row - ROW_ORIGIN) * GRID_SCALE];
 }
 
 const AGENT_ROLES = [
-  { role: "nurse", color: "#27ae60", speed: 0.55 },
-  { role: "nurse", color: "#27ae60", speed: 0.48 },
-  { role: "instructor", color: "#2980b9", speed: 0.65 },
-  { role: "emergency_responder", color: "#c0392b", speed: 1.05 },
-  { role: "supply_staff", color: "#8e44ad", speed: 0.38 },
+  { role: "nurse", color: "#27ae60", speed: 0.55, cruiseHeight: 1.45, bobAmplitude: 0.08, bobRate: 1.2, bobPhase: 0.0 },
+  { role: "nurse", color: "#27ae60", speed: 0.48, cruiseHeight: 1.58, bobAmplitude: 0.1, bobRate: 1.0, bobPhase: 0.9 },
+  { role: "instructor", color: "#2980b9", speed: 0.65, cruiseHeight: 1.88, bobAmplitude: 0.12, bobRate: 1.3, bobPhase: 1.7 },
+  { role: "emergency_responder", color: "#c0392b", speed: 1.05, cruiseHeight: 1.72, bobAmplitude: 0.09, bobRate: 1.6, bobPhase: 2.4 },
+  { role: "supply_staff", color: "#8e44ad", speed: 0.38, cruiseHeight: 1.34, bobAmplitude: 0.06, bobRate: 0.85, bobPhase: 3.1 },
 ];
 
 const SEV_COLOR: Record<Severity, string> = {
@@ -96,22 +101,29 @@ function buildAgentPaths(rooms: Array<Record<string, unknown>>): AgentPathDef[] 
   const patientRooms = rooms.filter((r) =>
     ["patient_room", "icu_bay", "simulation_room", "skills_lab"].includes(r.type as string),
   );
-
-  const corridorWaypoints: Array<[number, number, number]> = corridors
-    .sort((a, b) => {
-      const aCol = (a.grid_col as number) ?? 0;
-      const bCol = (b.grid_col as number) ?? 0;
-      return aCol - bCol;
-    })
-    .map((r) => gridToWorld((r.grid_col as number) ?? 0, (r.grid_row as number) ?? 0));
-
-  if (corridorWaypoints.length < 2) {
-    // Fallback: scatter around origin
-    corridorWaypoints.push([-1, 1, -1], [1, 1, -1], [1, 1, 1], [-1, 1, 1]);
-  }
-  const loopPath: Array<[number, number, number]> = [...corridorWaypoints, corridorWaypoints[0]];
+  const sortedCorridors = corridors.sort((a, b) => {
+    const aCol = (a.grid_col as number) ?? 0;
+    const bCol = (b.grid_col as number) ?? 0;
+    return aCol - bCol;
+  });
 
   return AGENT_ROLES.map((roleInfo, i) => {
+    const corridorWaypoints: Array<[number, number, number]> = sortedCorridors.length >= 2
+      ? sortedCorridors.map((r) =>
+          gridToWorld(
+            (r.grid_col as number) ?? 0,
+            (r.grid_row as number) ?? 0,
+            roleInfo.cruiseHeight,
+          ),
+        )
+      : [
+          [-1, roleInfo.cruiseHeight, -1],
+          [1, roleInfo.cruiseHeight, -1],
+          [1, roleInfo.cruiseHeight, 1],
+          [-1, roleInfo.cruiseHeight, 1],
+        ];
+    const loopPath: Array<[number, number, number]> = [...corridorWaypoints, corridorWaypoints[0]];
+
     let path: Array<[number, number, number]>;
     if (i < 2) {
       // Nurses: follow corridor loop
@@ -119,7 +131,11 @@ function buildAgentPaths(rooms: Array<Record<string, unknown>>): AgentPathDef[] 
     } else if (i === 2 && patientRooms.length > 0) {
       // Instructor: visits patient/sim rooms
       const roomWaypoints = patientRooms.slice(0, 4).map((r) =>
-        gridToWorld((r.grid_col as number) ?? 0, (r.grid_row as number) ?? 0),
+        gridToWorld(
+          (r.grid_col as number) ?? 0,
+          (r.grid_row as number) ?? 0,
+          roleInfo.cruiseHeight,
+        ),
       );
       path = [...roomWaypoints, roomWaypoints[0]];
     } else if (i === 3) {
@@ -148,6 +164,10 @@ function buildAgentPaths(rooms: Array<Record<string, unknown>>): AgentPathDef[] 
       role: roleInfo.role,
       color: roleInfo.color,
       speed: roleInfo.speed,
+      cruiseHeight: roleInfo.cruiseHeight,
+      bobAmplitude: roleInfo.bobAmplitude,
+      bobRate: roleInfo.bobRate,
+      bobPhase: roleInfo.bobPhase,
       path,
       segmentLengths,
       totalLength: totalLength || 1,
@@ -181,6 +201,7 @@ function projectToScreen(
 function interpolatePath(
   agent: AgentPathDef,
   distance: number,
+  elapsedSeconds: number,
   target: THREE.Vector3,
 ): THREE.Vector3 {
   const normalizedDistance =
@@ -194,10 +215,14 @@ function interpolatePath(
       const start = agent.path[index];
       const end = agent.path[index + 1];
       const progress = segmentLength === 0 ? 0 : (normalizedDistance - traversed) / segmentLength;
+      const worldY =
+        start[1] +
+        (end[1] - start[1]) * progress +
+        Math.sin(elapsedSeconds * agent.bobRate + agent.bobPhase) * agent.bobAmplitude;
 
       return target.set(
         start[0] + (end[0] - start[0]) * progress,
-        start[1] + (end[1] - start[1]) * progress,
+        worldY,
         start[2] + (end[2] - start[2]) * progress,
       );
     }
@@ -206,7 +231,57 @@ function interpolatePath(
   }
 
   const [x, y, z] = agent.path[0];
-  return target.set(x, y, z);
+  return target.set(
+    x,
+    y + Math.sin(elapsedSeconds * agent.bobRate + agent.bobPhase) * agent.bobAmplitude,
+    z,
+  );
+}
+
+function updateAgentTrail(
+  trailNodes: Array<HTMLSpanElement | null>,
+  history: ScreenPos[],
+  position: ScreenPos,
+) {
+  if (!position.visible) {
+    history.length = 0;
+    for (const node of trailNodes) {
+      if (!node) {
+        continue;
+      }
+      node.style.opacity = "0";
+      node.style.visibility = "hidden";
+    }
+    return;
+  }
+
+  history.unshift(position);
+  history.length = Math.min(history.length, AGENT_TRAIL_PARTICLES + 1);
+
+  for (let index = 0; index < AGENT_TRAIL_PARTICLES; index += 1) {
+    const node = trailNodes[index];
+    const sample = history[index + 1];
+
+    if (!node || !sample?.visible) {
+      if (node) {
+        node.style.opacity = "0";
+        node.style.visibility = "hidden";
+      }
+      continue;
+    }
+
+    const dx = sample.x - position.x;
+    const dy = sample.y - position.y;
+    const distance = Math.hypot(dx, dy);
+    const opacity = Math.max(0.08, 0.42 - index * 0.06);
+    const scale = Math.max(0.5, 1 - index * 0.08);
+
+    node.style.opacity = `${opacity}`;
+    node.style.visibility = "visible";
+    node.style.transform =
+      `translate3d(${dx}px, ${dy}px, 0) translate(-50%, -50%) scale(${scale})`;
+    node.style.filter = `blur(${Math.min(5, 1.2 + distance * 0.04)}px)`;
+  }
 }
 
 function updateProjectedElement(
@@ -240,6 +315,8 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
   const splatRef = useRef<HTMLDivElement>(null);
   const annotationRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const agentRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const agentTrailRefs = useRef<Record<string, Array<HTMLSpanElement | null>>>({});
+  const agentTrailHistoryRef = useRef<Record<string, ScreenPos[]>>({});
   const shellSizeRef = useRef({ width: 0, height: 0 });
   const frameRef = useRef<number>(0);
   const startTimeRef = useRef(0);
@@ -317,6 +394,10 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    agentTrailHistoryRef.current = {};
+  }, [agentPaths]);
+
   // Load scene graph → build agent patrol paths
   useEffect(() => {
     let cancelled = false;
@@ -377,12 +458,21 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
       const elapsedSeconds = (now - startTimeRef.current) / 1000;
 
       for (const agent of agentPaths) {
-        const worldPosition = interpolatePath(agent, elapsedSeconds * agent.speed, agentVector);
+        const worldPosition = interpolatePath(
+          agent,
+          elapsedSeconds * agent.speed,
+          elapsedSeconds,
+          agentVector,
+        );
+        const screenPosition = projectToScreen(worldPosition, viewer.camera, width, height);
         updateProjectedElement(
           agentRefs.current[agent.id],
-          projectToScreen(worldPosition, viewer.camera, width, height),
+          screenPosition,
           "none",
         );
+        const trailHistory = agentTrailHistoryRef.current[agent.id] ?? [];
+        agentTrailHistoryRef.current[agent.id] = trailHistory;
+        updateAgentTrail(agentTrailRefs.current[agent.id] ?? [], trailHistory, screenPosition);
       }
     };
 
@@ -507,10 +597,21 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
           <div
             key={agent.id}
             ref={(node) => { agentRefs.current[agent.id] = node; }}
-            className="agent-dot"
+            className="agent-marker"
             title={agent.role}
-            style={{ background: agent.color, opacity: 0, visibility: "hidden" }}
-          />
+            style={{ color: agent.color, opacity: 0, visibility: "hidden" }}
+          >
+            {Array.from({ length: AGENT_TRAIL_PARTICLES }, (_, index) => (
+              <span
+                key={`${agent.id}-trail-${index}`}
+                ref={(node) => {
+                  (agentTrailRefs.current[agent.id] ??= [])[index] = node;
+                }}
+                className="agent-trail"
+              />
+            ))}
+            <span className="agent-dot" />
+          </div>
         ))}
       </div>
 

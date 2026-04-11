@@ -1042,12 +1042,49 @@ tr:hover td {
 }
 
 /* ═ Swarm agent dots ═ */
+.agent-marker {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.agent-trail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 12px;
+  height: 4px;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(240, 234, 220, 0) 0%,
+      currentColor 42%,
+      rgba(240, 234, 220, 0.92) 100%
+    );
+  box-shadow: 0 0 12px currentColor;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  will-change: transform, opacity, filter;
+}
+
 .agent-dot {
   position: absolute;
-  width: 9px;
-  height: 9px;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  box-shadow: 0 0 8px currentColor, 0 0 0 1px rgba(240, 234, 220, 0.3);
+  transform: translate(-50%, -50%);
+  background:
+    radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.96), currentColor 62%);
+  box-shadow:
+    0 0 14px currentColor,
+    0 0 28px rgba(240, 234, 220, 0.2),
+    0 0 0 1px rgba(240, 234, 220, 0.34);
   opacity: 0.9;
   pointer-events: none;
   will-change: transform, opacity;
