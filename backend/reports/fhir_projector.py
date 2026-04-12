@@ -330,8 +330,8 @@ def build_condition_resource(intake: PatientIntake) -> dict:
         ext.append({"url": f"{_EXT_BASE}/vital-spo2","valueInteger": vitals.spo2})
     if vitals.gcs is not None:
         ext.append({"url": f"{_EXT_BASE}/vital-gcs", "valueInteger": vitals.gcs})
-    if vitals.eta_minutes := intake.eta_minutes:
-        ext.append({"url": f"{_EXT_BASE}/eta-minutes","valueInteger": vitals.eta_minutes})
+    if intake.eta_minutes is not None:
+        ext.append({"url": f"{_EXT_BASE}/eta-minutes", "valueInteger": intake.eta_minutes})
     if ext:
         resource["extension"] = ext
 
