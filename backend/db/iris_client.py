@@ -21,6 +21,21 @@ def utcnow() -> datetime:
     return datetime.now(tz=UTC)
 
 
+def latest_complete_scan_or_latest(scans: list[Scan]) -> Scan | None:
+    if not scans:
+        return None
+
+    complete_scans = sorted(
+        [scan for scan in scans if scan.status == "complete"],
+        key=lambda scan: scan.triggered_at,
+        reverse=True,
+    )
+    if complete_scans:
+        return complete_scans[0]
+
+    return sorted(scans, key=lambda scan: scan.triggered_at, reverse=True)[0]
+
+
 class MemoryIRISClient:
     """
     Development-safe stand-in for InterSystems IRIS.
@@ -493,6 +508,7 @@ class MemoryIRISClient:
         caption: str | None = None,
         thumbnail_url: str | None = None,
         world_marble_url: str | None = None,
+        spatial_bundle_json: dict | None = None,
         completed_at: datetime | None = None,
     ) -> WorldModel:
         model = self.models[model_id]
@@ -515,26 +531,32 @@ class MemoryIRISClient:
             updates["thumbnail_url"] = thumbnail_url
         if world_marble_url is not None:
             updates["world_marble_url"] = world_marble_url
+        if spatial_bundle_json is not None:
+            updates["spatial_bundle_json"] = spatial_bundle_json
         if completed_at is not None:
             updates["completed_at"] = completed_at
         self.models[model_id] = WorldModel.model_validate(updates)
         return self.models[model_id]
 
     def write_world_model(self, facility_id: str, world_model: dict[str, Any], model_id: str | None = None) -> WorldModel:
+        from backend.pipeline.spatial_bundle import build_spatial_bundle  # noqa: PLC0415
+
         unit = next(unit for unit in self.units.values() if unit.facility_id == facility_id)
         model = self.models.get(model_id) if model_id else None
         created_at = model.created_at if model else utcnow()
+        scene_graph = world_model["scene_manifest"]
         ready_model = WorldModel(
             model_id=model.model_id if model else f"model_{uuid4().hex[:8]}",
             unit_id=unit.unit_id,
             status="ready",
             splat_r2_key=world_model["splat_url"],
-            scene_graph_json=world_model["scene_manifest"],
+            scene_graph_json=scene_graph,
             world_labs_world_id=world_model["world_id"],
             source_image_count=world_model.get("source_image_count", 0),
             caption=world_model.get("caption"),
             thumbnail_url=world_model.get("thumbnail_url"),
             world_marble_url=world_model.get("world_marble_url"),
+            spatial_bundle_json=build_spatial_bundle(scene_graph),
             created_at=created_at,
             completed_at=utcnow(),
         )
@@ -616,13 +638,8 @@ class MemoryIRISClient:
 
     def list_findings(self, unit_id: str, domain: str | None = None, severity: str | None = None, room_id: str | None = None) -> list[Finding]:
         scans = [scan for scan in self.scans.values() if scan.unit_id == unit_id]
-        # Only use the most recent complete scan to avoid mixing stale data
-        complete_scans = sorted(
-            [s for s in scans if s.status == "complete"],
-            key=lambda s: s.triggered_at,
-            reverse=True,
-        )
-        source_scans = complete_scans[:1] if complete_scans else scans
+        source_scan = latest_complete_scan_or_latest(scans)
+        source_scans = [source_scan] if source_scan else []
         findings = [finding for scan in source_scans for finding in scan.findings]
         if domain:
             findings = [finding for finding in findings if finding.domain == domain]
@@ -1085,20 +1102,24 @@ class NativeIRISClient:
         return self._store_model("MedSentinel.WorldModel", model_id, updated)
 
     def write_world_model(self, facility_id: str, world_model: dict[str, Any], model_id: str | None = None) -> WorldModel:
+        from backend.pipeline.spatial_bundle import build_spatial_bundle  # noqa: PLC0415
+
         unit = self.get_unit_for_facility(facility_id)
         model = self.models.get(model_id) if model_id else None
         created_at = model.created_at if model else utcnow()
+        scene_graph = world_model["scene_manifest"]
         ready_model = WorldModel(
             model_id=model.model_id if model else f"model_{uuid4().hex[:8]}",
             unit_id=unit.unit_id,
             status="ready",
             splat_r2_key=world_model["splat_url"],
-            scene_graph_json=world_model["scene_manifest"],
+            scene_graph_json=scene_graph,
             world_labs_world_id=world_model["world_id"],
             source_image_count=world_model.get("source_image_count", 0),
             caption=world_model.get("caption"),
             thumbnail_url=world_model.get("thumbnail_url"),
             world_marble_url=world_model.get("world_marble_url"),
+            spatial_bundle_json=build_spatial_bundle(scene_graph),
             created_at=created_at,
             completed_at=utcnow(),
         )
@@ -1175,7 +1196,9 @@ class NativeIRISClient:
 
     def list_findings(self, unit_id: str, domain: str | None = None, severity: str | None = None, room_id: str | None = None) -> list[Finding]:
         scans = [scan for scan in self.scans.values() if scan.unit_id == unit_id]
-        findings = [finding for scan in scans for finding in scan.findings]
+        source_scan = latest_complete_scan_or_latest(scans)
+        source_scans = [source_scan] if source_scan else []
+        findings = [finding for scan in source_scans for finding in scan.findings]
         if domain:
             findings = [finding for finding in findings if finding.domain == domain]
         if severity:

@@ -6,6 +6,15 @@ import { isSplatAssetUrl } from "@/lib/splat";
 
 import type { Viewer } from "@mkkellogg/gaussian-splats-3d";
 
+function removeManagedMount(
+  container: HTMLDivElement,
+  mount: HTMLDivElement,
+) {
+  if (mount.parentNode === container) {
+    mount.remove();
+  }
+}
+
 export function useGaussianSplatViewer(
   signedUrl: string,
   containerRef: RefObject<HTMLDivElement | null>,
@@ -24,6 +33,41 @@ export function useGaussianSplatViewer(
     }
 
     let disposed = false;
+    const mount = document.createElement("div");
+    mount.style.position = "absolute";
+    mount.style.inset = "0";
+    container.replaceChildren(mount);
+
+    let viewer: Viewer | null = null;
+    let cleanedUp = false;
+
+    const teardown = () => {
+      if (cleanedUp) {
+        return;
+      }
+      cleanedUp = true;
+
+      const activeViewer = viewer;
+      viewer = null;
+      if (viewerRef.current === activeViewer) {
+        viewerRef.current = null;
+      }
+
+      if (activeViewer) {
+        try {
+          activeViewer.stop();
+        } catch {
+          // Best-effort teardown only.
+        }
+        try {
+          activeViewer.dispose();
+        } catch (disposeError) {
+          console.warn("Gaussian splat viewer cleanup raced with DOM teardown", disposeError);
+        }
+      }
+
+      removeManagedMount(container, mount);
+    };
 
     const load = async () => {
       try {
@@ -38,8 +82,8 @@ export function useGaussianSplatViewer(
           return;
         }
 
-        const viewer = new GS3D.Viewer({
-          rootElement: container,
+        viewer = new GS3D.Viewer({
+          rootElement: mount,
           cameraUp: [0, -1, 0],
           initialCameraPosition: [0, 1, 3],
           initialCameraLookAt: [0, 0.5, 0],
@@ -55,7 +99,7 @@ export function useGaussianSplatViewer(
         });
 
         if (disposed) {
-          viewer.dispose();
+          teardown();
           return;
         }
 
@@ -63,6 +107,7 @@ export function useGaussianSplatViewer(
         viewerRef.current = viewer;
         setError(null);
       } catch (loadError) {
+        teardown();
         if (!disposed) {
           setError(
             loadError instanceof Error
@@ -81,9 +126,7 @@ export function useGaussianSplatViewer(
 
     return () => {
       disposed = true;
-      viewerRef.current?.stop();
-      viewerRef.current?.dispose();
-      viewerRef.current = null;
+      teardown();
     };
   }, [containerRef, signedUrl]);
 

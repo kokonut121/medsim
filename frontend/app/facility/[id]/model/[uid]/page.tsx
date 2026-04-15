@@ -28,8 +28,7 @@ export default async function ModelPage({
         <p className="muted">3D splat canvas, finding feed, and real-time scan ribbon for unit {uid}.</p>
       </div>
       <div style={{ height: 20 }} />
-      <ModelClient unitId={uid} initialScan={initialScan} />
+      <ModelClient facilityId={id} unitId={uid} initialScan={initialScan} />
     </main>
   );
 }
-

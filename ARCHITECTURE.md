@@ -35,4 +35,5 @@ MedSim is organized into four legible layers:
 - Current persistence is in-memory for local determinism, but public interfaces mirror the PRD’s IRIS-backed behavior.
 - Setting `MEDSENTINEL_IRIS_MODE=native` switches the persistence seam to the InterSystems Native SDK and the configured FHIR repository.
 - Current world-model rendering is a viewer shell with annotation overlays and signed-URL plumbing. SparkJS wiring can replace the placeholder surface without route changes.
+- Local walkthrough repair and re-ingest can be run directly against IRIS with `scripts/reingest-video-model.py`, including an `--analysis-only` mode that refreshes scene graphs and scan inputs without regenerating the splat asset.
 - Current agent outputs are deterministic synthetic findings shaped to the PRD schema so downstream viewer and report flows are testable now.

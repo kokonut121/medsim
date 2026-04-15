@@ -6,10 +6,12 @@ No external API keys required.
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 
 import pytest
 
 from backend.db.iris_client import iris_client
+from backend.models import DomainStatus, Scan
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +110,7 @@ def test_model_status_for_unknown_unit_returns_404(client):
 
 def test_video_extract_endpoint_processes_without_invalid_status(client, fresh_iris, monkeypatch):
     monkeypatch.setattr(
-        "backend.api.video.extract_frames",
+        "backend.pipeline.video_ingest.extract_frames",
         lambda *_args, **_kwargs: [
             {
                 "source": "vr_video",
@@ -142,11 +144,11 @@ def test_video_extract_endpoint_processes_without_invalid_status(client, fresh_i
             "caption": f"{facility_name} walkthrough model",
         }
 
-    monkeypatch.setattr("backend.api.video.classify_image", fake_classify_image)
-    monkeypatch.setattr("backend.api.video.extract_scene_graph", fake_extract_scene_graph)
-    monkeypatch.setattr("backend.api.video.generate_world_model", fake_generate_world_model)
+    monkeypatch.setattr("backend.pipeline.video_ingest.classify_image", fake_classify_image)
+    monkeypatch.setattr("backend.pipeline.video_ingest.extract_scene_graph", fake_extract_scene_graph)
+    monkeypatch.setattr("backend.pipeline.video_ingest.generate_world_model", fake_generate_world_model)
     monkeypatch.setattr(
-        "backend.api.video._store_video_frame",
+        "backend.pipeline.video_ingest._store_video_frame",
         lambda key, payload, *, content_type: f"/api/fal-images/{key.replace('/', '_')}",
     )
 
@@ -164,7 +166,7 @@ def test_video_extract_endpoint_processes_without_invalid_status(client, fresh_i
 
 
 def test_process_video_offloads_blocking_frame_work(fresh_iris, monkeypatch):
-    import backend.api.video as video_api
+    import backend.pipeline.video_ingest as video_ingest
 
     calls: list[tuple[str, tuple[object, ...], dict[str, object]]] = []
 
@@ -207,15 +209,15 @@ def test_process_video_offloads_blocking_frame_work(fresh_iris, monkeypatch):
         calls.append((func.__name__, args, kwargs))
         return func(*args, **kwargs)
 
-    monkeypatch.setattr(video_api, "extract_frames", fake_extract_frames)
-    monkeypatch.setattr(video_api, "_store_video_frame", fake_store_video_frame)
-    monkeypatch.setattr(video_api, "classify_image", fake_classify_image)
-    monkeypatch.setattr(video_api, "extract_scene_graph", fake_extract_scene_graph)
-    monkeypatch.setattr(video_api, "generate_world_model", fake_generate_world_model)
-    monkeypatch.setattr(video_api.asyncio, "to_thread", fake_to_thread)
+    monkeypatch.setattr(video_ingest, "extract_frames", fake_extract_frames)
+    monkeypatch.setattr(video_ingest, "_store_video_frame", fake_store_video_frame)
+    monkeypatch.setattr(video_ingest, "classify_image", fake_classify_image)
+    monkeypatch.setattr(video_ingest, "extract_scene_graph", fake_extract_scene_graph)
+    monkeypatch.setattr(video_ingest, "generate_world_model", fake_generate_world_model)
+    monkeypatch.setattr(video_ingest.asyncio, "to_thread", fake_to_thread)
 
     asyncio.run(
-        video_api._process_video(
+        video_ingest.ingest_video_source(
             "fac_demo",
             model.model_id,
             b"x" * 2048,
@@ -319,7 +321,7 @@ def test_get_nonexistent_finding_returns_404(client):
 # Reports
 # ---------------------------------------------------------------------------
 
-def test_pdf_report_after_scan(client):
+def test_pdf_report_after_scan(client, fresh_iris):
     client.post("/api/scans/unit_1/run")
     r = client.get("/api/reports/unit_1/pdf")
     assert r.status_code == 200
@@ -327,7 +329,7 @@ def test_pdf_report_after_scan(client):
     assert len(r.content) > 100  # non-empty PDF
 
 
-def test_manifest_report_after_scan(client):
+def test_manifest_report_after_scan(client, fresh_iris):
     client.post("/api/scans/unit_1/run")
     r = client.get("/api/reports/unit_1/manifest")
     assert r.status_code == 200
@@ -337,6 +339,32 @@ def test_manifest_report_after_scan(client):
     assert len(data["findings"]) >= 1
 
 
+def test_manifest_report_prefers_latest_complete_scan_over_newer_queued_scan(client, fresh_iris):
+    seeded_scan = fresh_iris.get_scan("scan_demo_001")
+    fresh_iris.write_scan(
+        Scan(
+            scan_id="scan_newer_queued",
+            unit_id="unit_1",
+            model_id=seeded_scan.model_id,
+            status="queued",
+            domain_statuses={
+                domain: DomainStatus(status="queued", finding_count=0)
+                for domain in ["ICA", "MSA", "FRA", "ERA", "PFA", "SCA"]
+            },
+            findings=[],
+            triggered_at=seeded_scan.triggered_at + timedelta(minutes=1),
+            completed_at=None,
+        )
+    )
+
+    response = client.get("/api/reports/unit_1/manifest")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["scan_id"] == "scan_demo_001"
+    assert len(payload["findings"]) >= 1
+
+
 def test_pdf_report_before_scan_returns_404(client, fresh_iris):
-    r = client.get("/api/reports/unit_1/pdf")
+    r = client.get("/api/reports/unit_does_not_exist/pdf")
     assert r.status_code == 404

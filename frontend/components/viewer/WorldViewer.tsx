@@ -5,7 +5,8 @@ import * as THREE from "three";
 
 import { useGaussianSplatViewer } from "@/hooks/useGaussianSplatViewer";
 import { buildApiUrl, WS_BASE } from "@/lib/runtime";
-import { getFallbackSplatUrl, resolveSplatAssetUrl } from "@/lib/splat";
+import { resolveSplatAssetUrl } from "@/lib/splat";
+import type { Finding } from "@/types";
 
 type Severity = "CRITICAL" | "HIGH" | "ADVISORY";
 
@@ -135,7 +136,7 @@ const TARGET_OVERLAY_FPS = 30;
 const LIVE_FINDINGS_LIMIT = 5;
 // ~2 seconds of motion at TARGET_OVERLAY_FPS — length of the dotted contrail.
 const AGENT_TRAIL_SAMPLES = 60;
-const UNIT_ID = "unit_1";
+const DEFAULT_UNIT_ID = "unit_1";
 
 // Grid → world coordinate mapping (must match backend team_utils.py)
 const GRID_SCALE = 3.5;
@@ -482,6 +483,14 @@ function updateProjectedElement(
 
 interface WorldViewerProps {
   initialSplatUrl?: string;
+  unitId?: string;
+  findings?: Finding[] | null;
+  sceneGraph?: Record<string, unknown> | null;
+  brandSubtitle?: string;
+  ctaHref?: string;
+  ctaLabel?: string;
+  autoRunScan?: boolean;
+  viewportHeight?: number | string;
 }
 
 const ROOM_COLOR: Record<string, string> = {
@@ -540,7 +549,35 @@ function FloorPlan({
   );
 }
 
-export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
+function annotationsFromFindings(findings: Finding[]): AnnotationDef[] {
+  return findings.map((finding, index) => ({
+    id: finding.finding_id,
+    severity: finding.severity,
+    domain: finding.domain,
+    domainLabel: DOMAIN_LABEL[finding.domain] ?? finding.domain,
+    room: finding.room_id,
+    title: finding.label_text,
+    recommendation: finding.recommendation,
+    worldPos: [
+      finding.spatial_anchor.x,
+      finding.spatial_anchor.y,
+      finding.spatial_anchor.z,
+    ],
+    cardSide: index % 2 === 0 ? "right" : "left",
+  }));
+}
+
+export function WorldViewer({
+  initialSplatUrl,
+  unitId = DEFAULT_UNIT_ID,
+  findings,
+  sceneGraph,
+  brandSubtitle = "LeTourneau University · Nursing Skills Lab · Live scan",
+  ctaHref = "/dashboard",
+  ctaLabel = "Open dashboard →",
+  autoRunScan = true,
+  viewportHeight = "100%",
+}: WorldViewerProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const splatRef = useRef<HTMLDivElement>(null);
   const trailCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -570,12 +607,18 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
   );
   const loading = !noModel && !isIframeUrl && gaussianLoading;
 
+  useEffect(() => {
+    if (typeof initialSplatUrl === "string") {
+      setSplatUrl(initialSplatUrl);
+    }
+  }, [initialSplatUrl]);
+
   // Load splat URL
   useEffect(() => {
     if (splatUrl) return;
     let cancelled = false;
 
-    fetch(buildApiUrl(`/api/models/${UNIT_ID}/splat`), { cache: "no-store" })
+    fetch(buildApiUrl(`/api/models/${unitId}/splat`), { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((payload) => {
         if (cancelled) return;
@@ -584,21 +627,34 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
       .catch(() => { if (!cancelled) setSplatUrl(""); });
 
     return () => { cancelled = true; };
-  }, [splatUrl]);
+  }, [splatUrl, unitId]);
 
-  // Load findings from API → annotations; trigger scan if empty
+  // Use supplied findings when embedded in the facility model page; otherwise
+  // hydrate from the scan API and kick off a scan for the demo viewer.
   useEffect(() => {
+    if (findings) {
+      const defs = annotationsFromFindings(findings);
+      setAnnotations(defs);
+      if (defs.length > 0) {
+        setAgentPaths(buildAnnotationPaths(defs));
+      }
+      return;
+    }
+
     let cancelled = false;
 
     const load = () =>
-      fetch(buildApiUrl(`/api/scans/${UNIT_ID}/findings`), { cache: "no-store" })
+      fetch(buildApiUrl(`/api/scans/${unitId}/findings`), { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : []))
         .then((findings: Array<Record<string, unknown>>) => {
           if (cancelled) return;
           if (!findings.length) {
-            // Trigger a scan and retry after a delay
-            fetch(buildApiUrl(`/api/scans/${UNIT_ID}/run`), { method: "POST" }).catch(() => null);
-            setTimeout(load, 4000);
+            if (autoRunScan) {
+              fetch(buildApiUrl(`/api/scans/${unitId}/run`), { method: "POST" }).catch(() => null);
+              setTimeout(load, 4000);
+            } else {
+              setAnnotations([]);
+            }
             return;
           }
           const defs: AnnotationDef[] = findings.map((f, i) => {
@@ -627,7 +683,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
 
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [autoRunScan, findings, unitId]);
 
   useEffect(() => {
     agentTrailHistoryRef.current = {};
@@ -635,9 +691,23 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
 
   // Load scene graph → build agent patrol paths
   useEffect(() => {
+    if (sceneGraph) {
+      const rooms = (sceneGraph.units as Array<{rooms?: Array<Record<string, unknown>>}>)?.[0]?.rooms
+        ?? (sceneGraph.rooms as Array<Record<string, unknown>>) ?? [];
+      roomsRef.current = rooms;
+      setAgentPaths((current) => (annotations.length > 0 ? current : buildAgentPaths(rooms)));
+      setFloorRooms(rooms.map((room) => ({
+        id: room.room_id as string,
+        type: room.type as string,
+        col: (room.grid_col as number) ?? 0,
+        row: (room.grid_row as number) ?? 0,
+      })));
+      return;
+    }
+
     let cancelled = false;
 
-    fetch(buildApiUrl(`/api/models/${UNIT_ID}/scene_graph`), { cache: "no-store" })
+    fetch(buildApiUrl(`/api/models/${unitId}/scene_graph`), { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((sg: Record<string, unknown> | null) => {
         if (cancelled || !sg) return;
@@ -645,7 +715,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
           ?? (sg.rooms as Array<Record<string, unknown>>) ?? [];
         roomsRef.current = rooms;
         // Use corridor patrol as initial paths; overridden once annotations load
-        setAgentPaths(buildAgentPaths(rooms));
+        setAgentPaths((current) => (annotations.length > 0 ? current : buildAgentPaths(rooms)));
         setFloorRooms(rooms.map((r) => ({
           id: r.room_id as string,
           type: r.type as string,
@@ -656,7 +726,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
       .catch(() => null);
 
     return () => { cancelled = true; };
-  }, []);
+  }, [annotations.length, sceneGraph, unitId]);
 
   // Shell resize observer — also keeps the trail canvas backing store in sync.
   useEffect(() => {
@@ -821,7 +891,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
 
   // WebSocket live feed
   useEffect(() => {
-    const ws = new WebSocket(`${WS_BASE}/ws/scans/${UNIT_ID}/live`);
+    const ws = new WebSocket(`${WS_BASE}/ws/scans/${unitId}/live`);
 
     ws.onmessage = (event) => {
       try {
@@ -845,7 +915,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
     };
 
     return () => ws.close();
-  }, []);
+  }, [unitId]);
 
   const annotationCounts = annotations.reduce(
     (counts, a) => { counts[a.severity] += 1; return counts; },
@@ -853,7 +923,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
   );
 
   return (
-    <div ref={shellRef} className="world-shell">
+    <div ref={shellRef} className="world-shell" style={{ height: viewportHeight }}>
       {isIframeUrl ? (
         <iframe
           src={splatUrl}
@@ -950,7 +1020,7 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
 
       <div className="world-brand">
         <span className="world-brand__logo">MedSim</span>
-        <span className="world-brand__sub">LeTourneau University · Nursing Skills Lab · Live scan</span>
+        <span className="world-brand__sub">{brandSubtitle}</span>
       </div>
 
       {!isIframeUrl && !noModel && !loading && !error && (
@@ -1000,8 +1070,8 @@ export function WorldViewer({ initialSplatUrl }: WorldViewerProps) {
           <span className="world-stat__num">{agentPaths.length}</span>
           <span className="world-stat__label">Agents active</span>
         </div>
-        <a href="/dashboard" className="world-cta">
-          Open dashboard →
+        <a href={ctaHref} className="world-cta">
+          {ctaLabel}
         </a>
       </div>
     </div>

@@ -6,6 +6,7 @@ import cytoscape, {
   type Core,
   type ElementDefinition,
   type EventObject,
+  type Layouts,
   type LayoutOptions,
   type StylesheetCSS
 } from "cytoscape";
@@ -369,6 +370,7 @@ function GraphInner() {
   const status = useStore((state) => state.simulationStatus);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
+  const layoutRef = useRef<Layouts | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const tokens = useMemo(() => readCssTokens(), []);
 
@@ -376,10 +378,17 @@ function GraphInner() {
 
   // Mount Cytoscape exactly once.
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const mount = document.createElement("div");
+    mount.style.position = "absolute";
+    mount.style.inset = "0";
+    container.replaceChildren(mount);
+
     ensureFcose();
     const cy = cytoscape({
-      container: containerRef.current,
+      container: mount,
       elements: [],
       style: buildStylesheet(tokens),
       wheelSensitivity: 0.25,
@@ -404,7 +413,32 @@ function GraphInner() {
     return () => {
       cy.off("tap", "node", handleTap);
       cy.off("tap", handleBgTap);
-      cy.destroy();
+      layoutRef.current?.stop();
+      layoutRef.current = null;
+
+      // Detach the renderer from the DOM before destroying the core. This
+      // avoids Next/Fast Refresh teardown races where React has already swapped
+      // the container subtree by the time Cytoscape tries to remove its nodes.
+      if (!cy.destroyed()) {
+        try {
+          cy.stop();
+        } catch {
+          // Best-effort teardown only.
+        }
+        try {
+          cy.unmount();
+        } catch (unmountError) {
+          console.warn("Cytoscape cleanup raced with DOM teardown", unmountError);
+        }
+        try {
+          cy.destroy();
+        } catch (destroyError) {
+          console.warn("Cytoscape destroy raced with DOM teardown", destroyError);
+        }
+      }
+      if (mount.parentNode === container) {
+        mount.remove();
+      }
       cyRef.current = null;
     };
   }, []);
@@ -414,6 +448,8 @@ function GraphInner() {
     const cy = cyRef.current;
     if (!cy) return;
     if (!snapshot || snapshot.nodes.length === 0) {
+      layoutRef.current?.stop();
+      layoutRef.current = null;
       cy.elements().remove();
       return;
     }
@@ -448,7 +484,9 @@ function GraphInner() {
       });
     });
 
+    layoutRef.current?.stop();
     const layout = cy.layout(FCOSE_LAYOUT);
+    layoutRef.current = layout;
     layout.run();
   }, [snapshot]);
 

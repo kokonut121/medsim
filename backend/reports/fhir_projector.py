@@ -115,11 +115,13 @@ def build_diagnostic_report(scan: Scan) -> dict:
         "effectiveDateTime": timestamp,
         "issued": timestamp,
         "conclusion": f"{len(scan.findings)} findings synthesized for unit {scan.unit_id}",
-        "result": [
+    }
+
+    if scan.findings:
+        resource["result"] = [
             {"reference": f"Observation/{fhir_safe_id(finding.finding_id)}"}
             for finding in scan.findings
-        ],
-    }
+        ]
 
     if domain_extensions:
         resource["extension"] = domain_extensions

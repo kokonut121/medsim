@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/shallow";
 
 import { AgentActivityRibbon } from "@/components/findings/AgentActivityRibbon";
 import { FindingFeed } from "@/components/findings/FindingFeed";
-import { SplatRenderer } from "@/components/viewer/SplatRenderer";
+import { WorldViewer } from "@/components/viewer/WorldViewer";
 import { api } from "@/lib/api";
 import { useScanStream } from "@/hooks/useScanStream";
 import { useSplatModel } from "@/hooks/useSplatModel";
@@ -16,19 +16,51 @@ function scanMatchesModel(scan: Scan | null, modelId: string | null | undefined)
   return Boolean(scan && modelId && scan.model_id === modelId);
 }
 
-export function ModelClient({ unitId, initialScan }: { unitId: string; initialScan: Scan | null }) {
-  const { findings, selectedFindingId, setFindings } = useStore(
+export function ModelClient({
+  facilityId,
+  unitId,
+  initialScan
+}: {
+  facilityId: string;
+  unitId: string;
+  initialScan: Scan | null;
+}) {
+  const { findings, setFindings } = useStore(
     useShallow((state) => ({
       findings: state.findings,
-      selectedFindingId: state.selectedFindingId,
       setFindings: state.setFindings,
     })),
   );
   const { signedUrl, status, loading, error } = useSplatModel(unitId);
   const handledModelId = useRef<string | null>(null);
   const [scan, setScan] = useState<Scan | null>(initialScan);
+  const [sceneGraph, setSceneGraph] = useState<Record<string, unknown> | null>(null);
 
   useScanStream(unitId);
+
+  useEffect(() => {
+    if (status?.status !== "ready") {
+      setSceneGraph(null);
+      return;
+    }
+
+    let cancelled = false;
+    void api.getSceneGraph(unitId)
+      .then((graph) => {
+        if (!cancelled) {
+          setSceneGraph(graph);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSceneGraph(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status?.model_id, status?.status, unitId]);
 
   useEffect(() => {
     if (status?.status !== "ready" || !status.model_id || handledModelId.current === status.model_id) {
@@ -117,11 +149,6 @@ export function ModelClient({ unitId, initialScan }: { unitId: string; initialSc
     };
   }, [initialScan, setFindings, status?.model_id, status?.status, unitId]);
 
-  const selectedLabel = useMemo(
-    () => findings.find((finding) => finding.finding_id === selectedFindingId)?.label_text ?? null,
-    [findings, selectedFindingId]
-  );
-
   return (
     <div style={{ display: "grid", gap: 20 }}>
       {status?.status !== "ready" ? (
@@ -134,7 +161,17 @@ export function ModelClient({ unitId, initialScan }: { unitId: string; initialSc
         </div>
       ) : null}
       <div className="viewer-layout">
-        <SplatRenderer signedUrl={signedUrl} findings={findings} selectedLabel={selectedLabel} />
+        <WorldViewer
+          unitId={unitId}
+          initialSplatUrl={signedUrl}
+          findings={findings}
+          sceneGraph={sceneGraph}
+          autoRunScan={false}
+          brandSubtitle={`Facility ${facilityId} · Unit ${unitId} · Live scan`}
+          ctaHref={`/facility/${facilityId}`}
+          ctaLabel="Open facility →"
+          viewportHeight={720}
+        />
         <FindingFeed />
       </div>
       <AgentActivityRibbon scan={scan} />

@@ -101,7 +101,7 @@ class IRISPubSub:
                 # $INCREMENT is atomic and returns the new value. Write the
                 # payload AFTER the increment so subscribers can defensively
                 # detect in-flight writes by a missing node at ``seq``.
-                seq = client.increment(self.GLOBAL, channel, "counter")
+                seq = client.increment(1, self.GLOBAL, channel, "counter")
                 client.set(encoded, self.GLOBAL, channel, "events", seq)
             except Exception:
                 logger.exception("IRIS publish failed for channel %s", channel)

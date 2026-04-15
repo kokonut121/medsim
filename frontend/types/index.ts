@@ -1,6 +1,7 @@
 export type Domain = "ICA" | "MSA" | "FRA" | "ERA" | "PFA" | "SCA";
 export type Severity = "CRITICAL" | "HIGH" | "ADVISORY";
 export type ModelStatus = "queued" | "acquiring" | "classifying" | "generating" | "ready" | "failed";
+export type ImageSource = "street_view" | "places" | "supplemental_upload" | "world_labs" | "vr_video";
 
 export interface SpatialAnchor {
   x: number;
@@ -91,6 +92,34 @@ export interface FacilityCreateInput {
   unit_name?: string;
   unit_type?: string;
   floor?: number;
+}
+
+export interface CoverageArea {
+  area_id: string;
+  source: ImageSource | string;
+  image_count: number;
+  category: string | null;
+}
+
+export interface GapArea {
+  area_id: string;
+  description: string;
+}
+
+export interface CoverageMap {
+  facility_id: string;
+  covered_areas: CoverageArea[];
+  gap_areas: GapArea[];
+  updated_at: string | null;
+}
+
+export interface FacilityImage {
+  image_id: string;
+  url: string;
+  source: ImageSource | string;
+  category: string | null;
+  heading: number | null;
+  content_type: string;
 }
 
 // ---------------------------------------------------------------------------
